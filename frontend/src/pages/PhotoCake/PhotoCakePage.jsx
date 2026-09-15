@@ -804,7 +804,6 @@ const PhotoCakePage = () => {
                 </div>
               );
             })()}
-          </div>
 
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
