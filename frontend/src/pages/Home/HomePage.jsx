@@ -172,41 +172,42 @@ const HomePage = () => {
   };
 
   return (
-    <div className="relative min-h-screen space-y-16 sm:space-y-24 pb-20 overflow-hidden">
+    <div className="relative min-h-screen pb-20 overflow-hidden">
       {/* Ambient Floating Cakes across entire homepage without names */}
       <FloatingCakePieces />
 
-      {/* 1. HERO BANNER CAROUSEL */}
-      <section className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
-        {loading && banners.length === 0 ? (
-          <BannerSkeleton />
-        ) : banners.length > 0 ? (
-          <div className="relative w-full h-[380px] sm:h-[440px] md:h-[480px] lg:h-[510px] rounded-2xl sm:rounded-3xl overflow-hidden shadow-warm-lg bg-chocolate">
-            {banners.map((banner, idx) => (
-              <div
-                key={banner.id || idx}
-                className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${
-                  idx === currentBanner ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'
-                }`}
-              >
-                <picture className="w-full h-full block">
-                  {banner.mobile_image_url && (
-                    <source media="(max-width: 640px)" srcSet={banner.mobile_image_url} />
-                  )}
-                  <img
-                    src={banner.image_url}
-                    alt={banner.title}
-                    className="w-full h-full object-cover"
-                  />
-                </picture>
-                <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/50 to-transparent flex items-center">
-                  <div
-                    key={`${banner.id || idx}-${idx === currentBanner ? 'active' : 'inactive'}`}
-                    className="max-w-xl p-6 sm:p-9 md:p-12 lg:p-14 text-white space-y-3.5 sm:space-y-4 font-banner"
-                  >
-                    <span className="inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-bold text-[11px] sm:text-xs uppercase tracking-widest px-3 py-0.5 sm:px-3.5 sm:py-1 rounded-full backdrop-blur-xs shadow-md animate-banner-badge font-banner">
-                      <Sparkles className="w-3.5 h-3.5 animate-pulse text-amber-200" /> Handcrafted Daily
-                    </span>
+      <div className="space-y-12 sm:space-y-20">
+        {/* 1. HERO BANNER CAROUSEL */}
+        <section className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-1 sm:pt-2">
+          {loading && banners.length === 0 ? (
+            <BannerSkeleton />
+          ) : banners.length > 0 ? (
+            <div className="relative w-full h-[340px] sm:h-[400px] md:h-[460px] lg:h-[490px] rounded-2xl sm:rounded-3xl overflow-hidden shadow-warm-lg bg-chocolate">
+              {banners.map((banner, idx) => (
+                <div
+                  key={banner.id || idx}
+                  className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${
+                    idx === currentBanner ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'
+                  }`}
+                >
+                  <picture className="w-full h-full block">
+                    {banner.mobile_image_url && (
+                      <source media="(max-width: 640px)" srcSet={banner.mobile_image_url} />
+                    )}
+                    <img
+                      src={banner.image_url}
+                      alt={banner.title}
+                      className="w-full h-full object-cover object-[center_28%] sm:object-[center_22%]"
+                    />
+                  </picture>
+                  <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/65 sm:via-black/50 to-black/20 sm:to-transparent flex items-center">
+                    <div
+                      key={`${banner.id || idx}-${idx === currentBanner ? 'active' : 'inactive'}`}
+                      className="max-w-xl p-5 sm:p-8 md:p-12 lg:p-14 text-white space-y-3 sm:space-y-4 font-banner"
+                    >
+                      <span className="inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-bold text-[11px] sm:text-xs uppercase tracking-widest px-3 py-0.5 sm:px-3.5 sm:py-1 rounded-full backdrop-blur-xs shadow-md animate-banner-badge font-banner">
+                        <Sparkles className="w-3.5 h-3.5 animate-pulse text-amber-200" /> Handcrafted Daily
+                      </span>
                     <BannerTypewriter text={banner.title} isActive={idx === currentBanner} />
                     <p className="text-xs sm:text-sm md:text-base text-slate-200 leading-relaxed max-w-md line-clamp-2 sm:line-clamp-3 font-medium drop-shadow-sm animate-banner-subtitle font-banner">
                       {banner.subtitle}
