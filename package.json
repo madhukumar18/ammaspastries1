@@ -1,0 +1,15 @@
+{
+  "name": "ammas-pastries-fullstack",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "git:sync": "node scripts/git-auto-sync.js",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:backend": "cd backend && php artisan serve",
+    "build:frontend": "cd frontend && npm run build"
+  },
+  "keywords": [],
+  "author": "Madhu Kumar A",
+  "license": "ISC"
+}
