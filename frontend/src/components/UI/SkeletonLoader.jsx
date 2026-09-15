@@ -15,7 +15,7 @@ export const ProductCardSkeleton = () => (
 );
 
 export const BannerSkeleton = () => (
-  <div className="w-full h-[400px] md:h-[500px] bg-slate-100 rounded-3xl animate-pulse" />
+  <div className="w-full h-[380px] sm:h-[440px] md:h-[480px] lg:h-[510px] bg-slate-100 rounded-2xl sm:rounded-3xl animate-pulse" />
 );
 
 export const OrderCardSkeleton = () => (

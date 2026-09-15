@@ -31,20 +31,13 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         // 1. Roles & Admin
-        $superRole = Role::create([
-            'name' => 'Super Administrator',
-            'slug' => 'super_admin',
-            'description' => 'Full access to all operations',
-        ]);
-
-        $admin = Admin::create([
-            'name' => 'Ammas Administrator',
-            'email' => 'admin@ammaspastries.in',
-            'password' => Hash::make('Admin@12345'),
-            'role_id' => $superRole->id,
-            'role' => 'super_admin',
-            'is_active' => true,
-        ]);
+        $superRole = Role::firstOrCreate(
+            ['slug' => 'super_admin'],
+            [
+                'name' => 'Super Administrator',
+                'description' => 'Full access to all operations',
+            ]
+        );
 
         // Demo customer
         $demoUser = User::create([
@@ -819,7 +812,7 @@ class DatabaseSeeder extends Seeder
             'opening_time' => '10:00 AM',
             'closing_time' => '10:00 PM',
             'contact_phone' => '+91 80 4567 8900',
-            'contact_email' => 'care@ammaspastries.in',
+            'contact_email' => 'mkumar200418@gmail.com',
             'contact_address' => 'Ammas Pastries Central Kitchen & Head Office, MG Road, Bengaluru, Karnataka 560001',
             'home_intro_title' => 'Freshly Baked. Beautifully Crafted. Made With Love.',
             'home_intro_subtitle' => 'From everyday celebrations to unforgettable milestones, Ammas Pastries brings freshly baked artisanal cakes, pastries and treats right to your doorstep across Bengaluru.',
@@ -953,5 +946,7 @@ class DatabaseSeeder extends Seeder
                 ]);
             }
         }
+
+        $this->call(ThemeCakesSeeder::class);
     }
 }

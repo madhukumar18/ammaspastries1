@@ -31,6 +31,10 @@ class AdminProductController extends Controller
             $query->where('is_available', filter_var($request->input('is_available'), FILTER_VALIDATE_BOOLEAN));
         }
 
+        if ($request->filled('is_eggless')) {
+            $query->where('is_eggless', filter_var($request->input('is_eggless'), FILTER_VALIDATE_BOOLEAN));
+        }
+
         $perPage = min((int) $request->input('per_page', 15), 50);
         $products = $query->orderBy('id', 'desc')->paginate($perPage);
 
@@ -58,6 +62,12 @@ class AdminProductController extends Controller
             'base_price' => 'required|numeric|min:0',
             'discount_price' => 'nullable|numeric|min:0',
             'weight' => 'nullable|string|max:50',
+            'portion_type' => 'nullable|string|in:weight,portion,both',
+            'portion_unit' => 'nullable|string|max:50',
+            'portion_step' => 'nullable|string|max:50',
+            'piece_price' => 'nullable|numeric|min:0',
+            'piece_limit' => 'nullable|integer|min:0',
+            'piece_min' => 'nullable|integer|min:1',
             'is_eggless' => 'boolean',
             'stock' => 'integer|min:0',
             'is_available' => 'boolean',
@@ -136,6 +146,12 @@ class AdminProductController extends Controller
             'base_price' => 'sometimes|required|numeric|min:0',
             'discount_price' => 'nullable|numeric|min:0',
             'weight' => 'nullable|string|max:50',
+            'portion_type' => 'nullable|string|in:weight,portion,both',
+            'portion_unit' => 'nullable|string|max:50',
+            'portion_step' => 'nullable|string|max:50',
+            'piece_price' => 'nullable|numeric|min:0',
+            'piece_limit' => 'nullable|integer|min:0',
+            'piece_min' => 'nullable|integer|min:1',
             'is_eggless' => 'boolean',
             'stock' => 'integer|min:0',
             'is_available' => 'boolean',

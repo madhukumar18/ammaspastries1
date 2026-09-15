@@ -32,8 +32,16 @@ class ProductController extends Controller
             });
         }
 
-        // Filter by eggless
-        if ($request->has('eggless')) {
+        // Filter by diet / eggless (all, eggless, egg)
+        if ($request->filled('diet')) {
+            $diet = strtolower($request->input('diet'));
+            if ($diet === 'eggless') {
+                $query->where('is_eggless', true);
+            } elseif ($diet === 'egg') {
+                $query->where('is_eggless', false);
+            }
+            // 'all' leaves the query unrestricted to show both eggless and with-egg cakes
+        } elseif ($request->filled('eggless') && $request->input('eggless') !== 'all') {
             $isEggless = filter_var($request->input('eggless'), FILTER_VALIDATE_BOOLEAN);
             $query->where('is_eggless', $isEggless);
         }
@@ -116,12 +124,25 @@ class ProductController extends Controller
         ->where('is_available', true)
         ->firstOrFail();
 
-        // Related products in same category
-        $related = Product::where('category_id', $product->category_id)
+        // Related products in same category with full variants and category details
+        $related = Product::with(['category', 'variants', 'images'])
+            ->where('category_id', $product->category_id)
             ->where('id', '!=', $product->id)
             ->where('is_available', true)
-            ->limit(4)
+            ->limit(12)
             ->get();
+
+        // If fewer than 6 related items in same category, supplement with other popular products
+        if ($related->count() < 6) {
+            $existingIds = $related->pluck('id')->push($product->id)->all();
+            $supplements = Product::with(['category', 'variants', 'images'])
+                ->whereNotIn('id', $existingIds)
+                ->where('is_available', true)
+                ->orderBy('is_popular', 'desc')
+                ->limit(12 - $related->count())
+                ->get();
+            $related = $related->concat($supplements);
+        }
 
         return response()->json([
             'success' => true,

@@ -13,7 +13,7 @@ return new class extends Migration
             $table->string('order_number')->unique(); // e.g. AMP1001
             $table->foreignId('user_id')->nullable()->constrained('users')->nullOnDelete();
             $table->foreignId('outlet_id')->constrained('outlets');
-            
+
             // Customer contact & shipping snapshot
             $table->string('customer_name');
             $table->string('customer_email')->nullable();
@@ -22,7 +22,7 @@ return new class extends Migration
             $table->string('delivery_area');
             $table->string('delivery_city')->default('Bengaluru');
             $table->string('delivery_pincode', 10);
-            
+
             // Financial calculations (strictly database verified)
             $table->decimal('subtotal', 10, 2);
             $table->decimal('discount', 10, 2)->default(0);
@@ -35,10 +35,10 @@ return new class extends Migration
             // Payment status: pending, paid, failed, refunded
             $table->string('payment_status')->default('pending');
             $table->string('payment_method')->default('razorpay');
-            
-            // Order status: confirmed, preparing, out_for_delivery, delivered, cancelled
-            $table->string('order_status')->default('confirmed');
-            
+
+            // Order status: pending_payment, confirmed, preparing, out_for_delivery, delivered, cancelled
+            $table->string('order_status')->default('pending_payment');
+
             // Delivery schedule
             $table->date('delivery_date');
             $table->string('delivery_time_slot'); // e.g. "10:00 AM - 12:00 PM"

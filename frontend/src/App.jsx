@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AppProvider } from './context/AppContext';
 import ToastContainer from './components/UI/ToastContainer';
 import ScrollToTop from './components/UI/ScrollToTop';
+import BakeryCursorTrail from './components/UI/BakeryCursorTrail';
 
 // Layouts
 import PublicLayout from './components/Layout/PublicLayout';
@@ -39,17 +40,25 @@ import AdminBannersPage from './pages/Admin/AdminBannersPage';
 import AdminGiftingPage from './pages/Admin/AdminGiftingPage';
 import AdminReviewsPage from './pages/Admin/AdminReviewsPage';
 import AdminBulkImportsPage from './pages/Admin/AdminBulkImportsPage';
+import AdminBulkProductsPage from './pages/Admin/AdminBulkProductsPage';
 import AdminEnquiriesPage from './pages/Admin/AdminEnquiriesPage';
 import AdminSettingsPage from './pages/Admin/AdminSettingsPage';
+import AdminPhotoCakePage from './pages/Admin/AdminPhotoCakePage';
+import AdminRistaPosPage from './pages/Admin/AdminRistaPosPage';
+import AdminSecurityLogsPage from './pages/Admin/AdminSecurityLogsPage';
+import AdminCategoryImagesPage from './pages/Admin/AdminCategoryImagesPage';
+import ErrorBoundary from './components/UI/ErrorBoundary';
 
 function App() {
   return (
-    <BrowserRouter>
-      <AppProvider>
-        <ScrollToTop />
-        <ToastContainer />
+    <ErrorBoundary>
+      <BrowserRouter>
+        <AppProvider>
+          <ScrollToTop />
+          <ToastContainer />
+          <BakeryCursorTrail />
 
-        <Routes>
+          <Routes>
           {/* Public Storefront Routes */}
           <Route element={<PublicLayout />}>
             <Route path="/" element={<HomePage />} />
@@ -95,12 +104,18 @@ function App() {
             <Route index element={<Navigate to="/admin/dashboard" replace />} />
             <Route path="dashboard" element={<AdminDashboardPage />} />
             <Route path="products" element={<AdminProductsPage />} />
+            <Route path="photo-cakes" element={<AdminPhotoCakePage />} />
             <Route path="categories" element={<AdminCategoriesPage />} />
+            <Route path="category-images" element={<AdminCategoryImagesPage />} />
             <Route path="outlets" element={<AdminOutletsPage />} />
             <Route path="orders" element={<AdminOrdersPage />} />
+            <Route path="rista-pos" element={<AdminRistaPosPage />} />
+            <Route path="security-logs" element={<AdminSecurityLogsPage />} />
             <Route path="banners" element={<AdminBannersPage />} />
             <Route path="gifting" element={<AdminGiftingPage />} />
             <Route path="reviews" element={<AdminReviewsPage />} />
+            <Route path="bulk-products" element={<AdminBulkProductsPage />} />
+            <Route path="bulk-products-csv" element={<AdminBulkProductsPage />} />
             <Route path="bulk-imports" element={<AdminBulkImportsPage />} />
             <Route path="franchise-enquiries" element={<AdminEnquiriesPage />} />
             <Route path="contact-enquiries" element={<AdminEnquiriesPage />} />
@@ -112,7 +127,8 @@ function App() {
         </Routes>
       </AppProvider>
     </BrowserRouter>
-  );
+  </ErrorBoundary>
+);
 }
 
 export default App;

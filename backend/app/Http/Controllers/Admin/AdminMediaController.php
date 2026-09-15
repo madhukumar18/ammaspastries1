@@ -14,7 +14,7 @@ class AdminMediaController extends Controller
     public function upload(Request $request)
     {
         $request->validate([
-            'image' => 'required|image|mimes:jpeg,png,webp,jpg,gif|max:15360', // max 15MB
+            'image' => 'required|image|mimes:jpeg,png,webp,jpg,gif|max:30720', // max 30MB
             'folder' => 'nullable|string|in:products,banners,general',
         ]);
 

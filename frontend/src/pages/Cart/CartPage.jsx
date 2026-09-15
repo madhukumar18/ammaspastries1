@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import api from '../../services/api';
+import ProductCarousel from '../../components/UI/ProductCarousel';
 import {
   Trash2,
   Heart,
@@ -36,6 +37,28 @@ const CartPage = () => {
   const deliveryFee = cartSubtotal >= 1000 || cartSubtotal === 0 ? 0 : 50;
   const tax = roundToTwo((cartSubtotal - couponDiscount) * 0.05);
   const finalTotal = Math.max(0, cartSubtotal - couponDiscount + deliveryFee + tax);
+
+  const [relatedProducts, setRelatedProducts] = useState([]);
+
+  useEffect(() => {
+    const fetchRelated = async () => {
+      try {
+        const catSlug = cart[0]?.product?.category?.slug || 'cakes-pastries';
+        const res = await api.get(`/products?category=${catSlug}&per_page=10`);
+        if (res.data?.data) {
+          const cartProductIds = cart.map((item) => item.product?.id);
+          const filtered = res.data.data.filter((p) => !cartProductIds.includes(p.id));
+          setRelatedProducts(filtered.length > 0 ? filtered : res.data.data);
+        }
+      } catch (err) {
+        console.warn('Failed to load related products for cart:', err);
+      }
+    };
+
+    if (cart.length > 0) {
+      fetchRelated();
+    }
+  }, [cart[0]?.product?.category?.slug]);
 
   function roundToTwo(num) {
     return +(Math.round(num + "e+2")  + "e-2");
@@ -163,9 +186,13 @@ const CartPage = () => {
                           {item.customization.flavour}
                         </span>
                       )}
-                      {item.customization?.is_eggless && (
-                        <span className="bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded-md font-medium">
-                          🌱 100% Eggless
+                      {item.customization?.is_eggless !== undefined && (
+                        <span className={`px-2 py-0.5 rounded-md font-medium ${
+                          item.customization.is_eggless
+                            ? 'bg-emerald-50 text-emerald-800'
+                            : 'bg-amber-50 text-amber-900'
+                        }`}>
+                          {item.customization.is_eggless ? '🌱 100% Eggless' : '🥚 With Egg'}
                         </span>
                       )}
                     </div>
@@ -347,6 +374,18 @@ const CartPage = () => {
         </div>
 
       </div>
+
+      {/* Related Products Carousel */}
+      {relatedProducts.length > 0 && (
+        <div className="pt-4">
+          <ProductCarousel
+            products={relatedProducts}
+            title="Pairs Wonderfully With Your Selection"
+            subtitle="Frequently ordered together • Same instant Add to Cart & Order actions"
+            badgeText="Chef's Pairings"
+          />
+        </div>
+      )}
 
     </div>
   );

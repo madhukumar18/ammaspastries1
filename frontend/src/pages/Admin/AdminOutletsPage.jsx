@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 import { useApp } from '../../context/AppContext';
-import { MapPin, Plus, Edit2, Trash2, Phone, Clock, Search, CheckCircle2, XCircle } from 'lucide-react';
+import { geocodeAddress, extractCoordsFromMapUrl } from '../../services/geocodingService.js';
+import { MapPin, Plus, Edit2, Trash2, Phone, Clock, Search, CheckCircle2, XCircle, Crosshair, Navigation, ExternalLink, Link2, MonitorSmartphone } from 'lucide-react';
 
 const AdminOutletsPage = () => {
   const { showToast } = useApp();
@@ -13,6 +14,7 @@ const AdminOutletsPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingOutlet, setEditingOutlet] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [detectingCoords, setDetectingCoords] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -22,10 +24,15 @@ const AdminOutletsPage = () => {
     city: 'Bengaluru',
     state: 'Karnataka',
     pincode: '',
+    map_link: '',
+    latitude: '',
+    longitude: '',
     phone: '',
     opening_time: '09:00 AM',
     closing_time: '10:30 PM',
     is_active: true,
+    rista_store_id: '',
+    rista_pos_enabled: true,
   });
 
   const fetchOutlets = async () => {
@@ -57,10 +64,15 @@ const AdminOutletsPage = () => {
       city: 'Bengaluru',
       state: 'Karnataka',
       pincode: '',
+      map_link: '',
+      latitude: '',
+      longitude: '',
       phone: '',
       opening_time: '09:00 AM',
       closing_time: '10:30 PM',
       is_active: true,
+      rista_store_id: '',
+      rista_pos_enabled: true,
     });
     setIsModalOpen(true);
   };
@@ -75,12 +87,53 @@ const AdminOutletsPage = () => {
       city: outlet.city || 'Bengaluru',
       state: outlet.state || 'Karnataka',
       pincode: outlet.pincode || '',
+      map_link: outlet.map_link || '',
+      latitude: outlet.latitude || '',
+      longitude: outlet.longitude || '',
       phone: outlet.phone || '',
       opening_time: outlet.opening_time || '09:00 AM',
       closing_time: outlet.closing_time || '10:30 PM',
       is_active: !!outlet.is_active,
+      rista_store_id: outlet.rista_store_id || '',
+      rista_pos_enabled: outlet.rista_pos_enabled !== undefined ? !!outlet.rista_pos_enabled : true,
     });
     setIsModalOpen(true);
+  };
+
+  const handleMapLinkChange = async (url) => {
+    setFormData((prev) => ({ ...prev, map_link: url }));
+    if (!url || !url.trim()) return;
+
+    // 1. Try instant client-side extraction first
+    const clientCoords = extractCoordsFromMapUrl(url);
+    if (clientCoords) {
+      setFormData((prev) => ({
+        ...prev,
+        latitude: clientCoords.lat,
+        longitude: clientCoords.lng,
+      }));
+      return;
+    }
+
+    // 2. If it's a short URL (goo.gl / maps.app.goo.gl), call backend to expand & parse
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      setDetectingCoords(true);
+      try {
+        const res = await api.post('/admin/outlets/parse-map-link', { url });
+        if (res.data?.success && res.data?.coordinates) {
+          setFormData((prev) => ({
+            ...prev,
+            latitude: res.data.coordinates.lat,
+            longitude: res.data.coordinates.lng,
+          }));
+          showToast('GPS coordinates extracted from Google Maps link! 📍', 'success');
+        }
+      } catch (err) {
+        // Handled silently or will geocode on save
+      } finally {
+        setDetectingCoords(false);
+      }
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -107,11 +160,12 @@ const AdminOutletsPage = () => {
   const handleDelete = async (id, name) => {
     if (!window.confirm(`Are you sure you want to delete outlet "${name}"?`)) return;
     try {
-      await api.delete(`/admin/outlets/${id}`);
-      showToast('Outlet deleted.', 'success');
+      const res = await api.delete(`/admin/outlets/${id}`);
+      showToast(res.data?.message || 'Outlet deleted.', 'success');
       setOutlets((prev) => prev.filter((o) => o.id !== id));
     } catch (err) {
-      showToast('Failed to delete outlet.', 'error');
+      const msg = err.response?.data?.message || 'Failed to delete outlet.';
+      showToast(msg, 'error');
     }
   };
 
@@ -198,6 +252,52 @@ const AdminOutletsPage = () => {
                     <Clock className="w-3.5 h-3.5 text-bakery-500" />
                     <span>{outlet.opening_time} - {outlet.closing_time}</span>
                   </div>
+                  <div className="flex items-center justify-between text-[11px] pt-1 text-slate-600 font-mono">
+                    <span className="text-slate-500 flex items-center gap-1">
+                      <MonitorSmartphone className="w-3 h-3 text-amber-600" />
+                      Rista Store ID:
+                    </span>
+                    <strong className="text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200/60 font-bold">
+                      {outlet.rista_store_id || outlet.code}
+                    </strong>
+                  </div>
+                  <div className="pt-2 flex items-center justify-between gap-2">
+                    {outlet.map_link ? (
+                      <a
+                        href={outlet.map_link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-[11px] font-medium text-bakery-700 hover:text-bakery-900 bg-amber-50 hover:bg-amber-100/80 px-2.5 py-1 rounded-lg border border-amber-200/80 transition-all"
+                        title="Open in Google Maps"
+                      >
+                        <MapPin className="w-3.5 h-3.5 text-bakery-600" />
+                        <span>Google Map Link</span>
+                        <ExternalLink className="w-3 h-3 text-bakery-500" />
+                      </a>
+                    ) : outlet.latitude && outlet.longitude ? (
+                      <a
+                        href={`https://www.google.com/maps?q=${outlet.latitude},${outlet.longitude}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-[11px] font-medium text-bakery-700 hover:text-bakery-900 bg-amber-50 hover:bg-amber-100/80 px-2.5 py-1 rounded-lg border border-amber-200/80 transition-all"
+                        title="View on Google Maps"
+                      >
+                        <MapPin className="w-3.5 h-3.5 text-bakery-600" />
+                        <span>View on Map</span>
+                        <ExternalLink className="w-3 h-3 text-bakery-500" />
+                      </a>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[11px] text-gray-400">
+                        <MapPin className="w-3 h-3" /> No Map Link
+                      </span>
+                    )}
+
+                    {outlet.latitude && outlet.longitude && (
+                      <span className="text-[10px] text-emerald-700 font-mono bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200/50">
+                        {Number(outlet.latitude).toFixed(3)}, {Number(outlet.longitude).toFixed(3)}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -225,7 +325,7 @@ const AdminOutletsPage = () => {
       {/* Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-cream-200">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-cream-200 max-h-[90vh] overflow-y-auto">
             <h2 className="text-xl font-serif font-bold text-gray-900 mb-1">
               {editingOutlet ? 'Edit Outlet' : 'Add New Bakery Branch'}
             </h2>
@@ -306,6 +406,54 @@ const AdminOutletsPage = () => {
                 </div>
               </div>
 
+              {/* Outlet Google Maps Link Section */}
+              <div className="bg-cream-50/90 p-4 rounded-2xl border border-cream-200 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-bakery-900 flex items-center gap-1.5">
+                    <MapPin className="w-4 h-4 text-bakery-600" />
+                    Outlet Google Maps Link
+                  </label>
+                  {formData.map_link && (
+                    <a
+                      href={formData.map_link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-[11px] font-medium text-bakery-700 hover:text-bakery-900 hover:underline"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      Test Link
+                    </a>
+                  )}
+                </div>
+
+                <div className="relative">
+                  <input
+                    type="url"
+                    value={formData.map_link}
+                    onChange={(e) => handleMapLinkChange(e.target.value)}
+                    placeholder="Paste Google Maps share link (e.g. https://maps.app.goo.gl/... or https://goo.gl/maps/...)"
+                    className="w-full px-3.5 py-2.5 bg-white border border-cream-300 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-bakery-500 text-gray-800 placeholder-gray-400 font-mono"
+                  />
+                  {detectingCoords && (
+                    <span className="absolute right-3 top-2.5 text-[11px] text-bakery-600 flex items-center gap-1 font-sans">
+                      <Crosshair className="w-3.5 h-3.5 animate-spin" /> Detecting...
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-gray-500">
+                  <p>
+                    Paste the outlet's Google Maps link. The exact location coordinates will be detected automatically.
+                  </p>
+                  {formData.latitude && formData.longitude && (
+                    <span className="inline-flex items-center gap-1 font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 text-[10px]">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                      Linked: {Number(formData.latitude).toFixed(4)}, {Number(formData.longitude).toFixed(4)}
+                    </span>
+                  )}
+                </div>
+              </div>
+
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1">Phone Number</label>
@@ -351,6 +499,43 @@ const AdminOutletsPage = () => {
                 <label htmlFor="outlet_is_active" className="text-xs font-medium text-gray-700">
                   Outlet is open for ordering and local delivery
                 </label>
+              </div>
+
+              {/* Rista POS Integration Settings */}
+              <div className="bg-amber-50/70 p-4 rounded-2xl border border-amber-200 space-y-3">
+                <div className="flex items-center gap-2">
+                  <MonitorSmartphone className="w-4 h-4 text-amber-700" />
+                  <span className="text-xs font-bold text-chocolate uppercase tracking-wider">
+                    Rista POS (DotPe) Terminal Mapping
+                  </span>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Rista Store ID (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.rista_store_id}
+                    onChange={(e) => setFormData({ ...formData, rista_store_id: e.target.value })}
+                    placeholder={`Defaults to code: ${formData.code || 'BLR-123'}`}
+                    className="w-full px-3 py-2 bg-white border border-amber-300 rounded-xl text-xs font-mono font-bold text-chocolate focus:outline-none focus:ring-2 focus:ring-bakery-500"
+                  />
+                  <p className="text-[11px] text-gray-500 mt-1">
+                    The branch Store ID from your DotPe / Rista POS dashboard. If left blank, the branch code will be used automatically.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 pt-1">
+                  <input
+                    type="checkbox"
+                    id="rista_pos_enabled"
+                    checked={formData.rista_pos_enabled}
+                    onChange={(e) => setFormData({ ...formData, rista_pos_enabled: e.target.checked })}
+                    className="rounded text-bakery-600 focus:ring-bakery-500"
+                  />
+                  <label htmlFor="rista_pos_enabled" className="text-xs font-medium text-gray-700">
+                    Route online customer orders directly to this outlet's KOT printer & POS
+                  </label>
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-cream-100">

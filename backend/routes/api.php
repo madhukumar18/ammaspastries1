@@ -27,9 +27,13 @@ use App\Http\Controllers\Admin\AdminBannerController;
 use App\Http\Controllers\Admin\AdminGiftingController;
 use App\Http\Controllers\Admin\AdminReviewController;
 use App\Http\Controllers\Admin\AdminBulkImportController;
+use App\Http\Controllers\Admin\AdminBulkProductController;
 use App\Http\Controllers\Admin\AdminEnquiryController;
 use App\Http\Controllers\Admin\AdminSettingsController;
 use App\Http\Controllers\Admin\AdminMediaController;
+use App\Http\Controllers\Admin\AdminRistaPosController;
+use App\Http\Controllers\Admin\AdminSecurityLogController;
+use App\Http\Controllers\Admin\AdminCategoryImageController;
 
 /*
 |--------------------------------------------------------------------------
@@ -70,7 +74,8 @@ Route::get('/most-popular', [ProductController::class, 'mostPopular']);
 Route::get('/outlets', [OutletController::class, 'index']);
 Route::get('/outlets/{id}', [OutletController::class, 'show']);
 
-// Photo Cake Upload & Preview
+// Photo Cake Upload, Preview & Config
+Route::get('/photo-cakes/config', [PhotoCakeController::class, 'config']);
 Route::post('/photo-cakes/upload', [PhotoCakeController::class, 'upload']);
 Route::get('/photo-cakes/preview/{token}', [PhotoCakeController::class, 'preview']);
 
@@ -105,17 +110,23 @@ Route::post('/enquiries/contact', [EnquiryController::class, 'storeContact']);
 // Content & Settings
 Route::get('/settings/delivery-bar', [ContentController::class, 'deliveryBar']);
 Route::get('/content/banners', [ContentController::class, 'banners']);
+Route::get('/content/category-images', [ContentController::class, 'categoryImages']);
+Route::get('/category-images', [ContentController::class, 'categoryImages']);
 Route::get('/content/countries', [ContentController::class, 'countries']);
 Route::get('/content/policies/{slug}', [ContentController::class, 'policy']);
 Route::get('/content/about-us', [ContentController::class, 'aboutUs']);
 Route::get('/content/contact-info', [ContentController::class, 'contactInfo']);
 Route::post('/coupons/validate', [ContentController::class, 'validateCoupon']);
+Route::get('/geocode', [ContentController::class, 'geocode']);
 
 
 // --- Admin Endpoints ---
 
 // Admin Auth
 Route::post('/admin/login', [AdminAuthController::class, 'login']);
+Route::post('/admin/register', [AdminAuthController::class, 'register']);
+Route::post('/admin/forgot-password', [AdminAuthController::class, 'forgotPassword']);
+Route::post('/admin/reset-password', [AdminAuthController::class, 'resetPassword']);
 
 // Protected Admin Routes
 Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
@@ -131,6 +142,9 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
     Route::get('/dashboard/sales-line-graph', [AdminDashboardController::class, 'salesLineGraph']);
 
     // Products Management
+    Route::get('/products/export-csv', [AdminBulkProductController::class, 'exportCsv']);
+    Route::get('/products/csv-template', [AdminBulkProductController::class, 'downloadTemplate']);
+    Route::post('/products/bulk-upload', [AdminBulkProductController::class, 'importCsv']);
     Route::get('/products', [AdminProductController::class, 'index']);
     Route::post('/products', [AdminProductController::class, 'store']);
     Route::get('/products/{id}', [AdminProductController::class, 'show']);
@@ -144,11 +158,13 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
     Route::put('/categories/{id}', [AdminCategoryController::class, 'update']);
     Route::delete('/categories/{id}', [AdminCategoryController::class, 'destroy']);
     Route::post('/subcategories', [AdminCategoryController::class, 'storeSubcategory']);
+    Route::put('/subcategories/{id}', [AdminCategoryController::class, 'updateSubcategory']);
     Route::delete('/subcategories/{id}', [AdminCategoryController::class, 'destroySubcategory']);
 
     // Outlets Management
     Route::get('/outlets', [AdminOutletController::class, 'index']);
     Route::post('/outlets', [AdminOutletController::class, 'store']);
+    Route::post('/outlets/parse-map-link', [AdminOutletController::class, 'parseMapLink']);
     Route::put('/outlets/{id}', [AdminOutletController::class, 'update']);
     Route::delete('/outlets/{id}', [AdminOutletController::class, 'destroy']);
 
@@ -157,7 +173,10 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
     Route::get('/orders/{id}', [AdminOrderController::class, 'show']);
     Route::put('/orders/{id}/status', [AdminOrderController::class, 'updateStatus']);
 
-    // Protected Photo Cake Access
+    // Protected Photo Cake Access & Management
+    Route::get('/photo-cake/management', [AdminPhotoCakeController::class, 'getManagementConfig']);
+    Route::post('/photo-cake/management', [AdminPhotoCakeController::class, 'saveManagementConfig']);
+    Route::post('/photo-cake/shape-image', [AdminPhotoCakeController::class, 'uploadShapeImage']);
     Route::get('/photo-cake/{uploadId}/preview', [AdminPhotoCakeController::class, 'preview']);
     Route::get('/photo-cake/{uploadId}/download', [AdminPhotoCakeController::class, 'download']);
 
@@ -166,6 +185,16 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
     Route::post('/banners', [AdminBannerController::class, 'store']);
     Route::put('/banners/{id}', [AdminBannerController::class, 'update']);
     Route::delete('/banners/{id}', [AdminBannerController::class, 'destroy']);
+
+    // Category Images Showcase
+    Route::get('/category-images', [AdminCategoryImageController::class, 'index']);
+    Route::get('/category-images/settings', [AdminCategoryImageController::class, 'getSettings']);
+    Route::post('/category-images/settings', [AdminCategoryImageController::class, 'updateSettings']);
+    Route::post('/category-images', [AdminCategoryImageController::class, 'store']);
+    Route::put('/category-images/{id}', [AdminCategoryImageController::class, 'update']);
+    Route::delete('/category-images/{id}', [AdminCategoryImageController::class, 'destroy']);
+    Route::patch('/category-images/{id}/toggle-status', [AdminCategoryImageController::class, 'toggleStatus']);
+    Route::post('/category-images/reset-defaults', [AdminCategoryImageController::class, 'resetDefaults']);
 
     // Gifting & Dream Cake
     Route::get('/gifting', [AdminGiftingController::class, 'getGifting']);
@@ -199,4 +228,20 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
     Route::post('/settings', [AdminSettingsController::class, 'updateSettings']);
     Route::get('/policies', [AdminSettingsController::class, 'getPolicies']);
     Route::put('/policies/{slug}', [AdminSettingsController::class, 'updatePolicy']);
+
+    // Rista POS (DotPe) Integration
+    Route::get('/rista-pos/config', [AdminRistaPosController::class, 'getConfig']);
+    Route::post('/rista-pos/test-connection', [AdminRistaPosController::class, 'testConnection']);
+    Route::get('/rista-pos/outlets', [AdminRistaPosController::class, 'getOutlets']);
+    Route::put('/rista-pos/outlets/{id}', [AdminRistaPosController::class, 'updateOutlet']);
+    Route::get('/rista-pos/orders', [AdminRistaPosController::class, 'getOrders']);
+    Route::post('/rista-pos/orders/{id}/sync', [AdminRistaPosController::class, 'syncOrder']);
+
+    // Security Threat & Error Logs
+    Route::get('/security-logs', [AdminSecurityLogController::class, 'index']);
+    Route::get('/security-logs/stats', [AdminSecurityLogController::class, 'stats']);
+    Route::get('/security-logs/download', [AdminSecurityLogController::class, 'download']);
+    Route::post('/security-logs/clear', [AdminSecurityLogController::class, 'clear']);
+    Route::delete('/security-logs/{incidentId}', [AdminSecurityLogController::class, 'destroy']);
+    Route::post('/security-logs/test-alert', [AdminSecurityLogController::class, 'testAlert']);
 });

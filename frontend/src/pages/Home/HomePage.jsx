@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../services/api';
 import ProductCard from '../../components/UI/ProductCard';
+import CategoryImagesCarousel from '../../components/UI/CategoryImagesCarousel';
 import { ProductCardSkeleton, BannerSkeleton } from '../../components/UI/SkeletonLoader';
 import {
   ChevronLeft,
@@ -15,8 +16,70 @@ import {
   HeartHandshake,
   Cake,
   Globe2,
-  CheckCircle2
+  CheckCircle2,
+  Crown
 } from 'lucide-react';
+
+// Typewriter header component exclusively for the hero banner title
+const BannerTypewriter = ({ text = '', isActive }) => {
+  const [displayedText, setDisplayedText] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+
+  useEffect(() => {
+    if (!isActive) {
+      setDisplayedText('');
+      setIsTyping(false);
+      return;
+    }
+
+    setDisplayedText('');
+    setIsTyping(true);
+
+    let currentIndex = 0;
+    const timeout = setTimeout(() => {
+      const interval = setInterval(() => {
+        if (currentIndex < text.length) {
+          setDisplayedText(text.slice(0, currentIndex + 1));
+          currentIndex++;
+        } else {
+          clearInterval(interval);
+          setIsTyping(false);
+        }
+      }, 65);
+
+      return () => clearInterval(interval);
+    }, 200);
+
+    return () => clearTimeout(timeout);
+  }, [text, isActive]);
+
+  return (
+    <div className="grid grid-cols-1">
+      {/* Invisible anchor maintaining exact text wrapping and container height without layout shift */}
+      <h1
+        aria-hidden="true"
+        className="font-banner text-3xl sm:text-4xl md:text-5xl lg:text-[54px] font-extrabold leading-tight tracking-tight drop-shadow-md text-transparent select-none pointer-events-none invisible"
+        style={{ gridArea: '1 / 1' }}
+      >
+        {text}
+      </h1>
+      {/* Live typewriter text */}
+      <h1
+        className="font-banner text-3xl sm:text-4xl md:text-5xl lg:text-[54px] font-extrabold leading-tight tracking-tight drop-shadow-md text-white"
+        style={{ gridArea: '1 / 1' }}
+      >
+        <span>{displayedText}</span>
+        {isActive && (
+          <span
+            className={`inline-block w-[3px] sm:w-1 md:w-1.5 h-[0.82em] bg-amber-400 ml-1.5 align-middle rounded-full shadow-sm ${
+              isTyping ? 'animate-pulse' : 'opacity-0 transition-opacity duration-500'
+            }`}
+          />
+        )}
+      </h1>
+    </div>
+  );
+};
 
 const HomePage = () => {
   // State for homepage sections
@@ -27,6 +90,7 @@ const HomePage = () => {
   const [latestActiveTab, setLatestActiveTab] = useState('new'); // 'new' or 'popular'
   const [newArrivals, setNewArrivals] = useState([]);
   const [mostPopular, setMostPopular] = useState([]);
+  const [themeCakes, setThemeCakes] = useState([]);
   const [countries, setCountries] = useState([]);
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -43,6 +107,7 @@ const HomePage = () => {
           popRes,
           countriesRes,
           reviewsRes,
+          themeCakesRes,
         ] = await Promise.allSettled([
           api.get('/content/banners'),
           api.get('/gifting'),
@@ -51,6 +116,7 @@ const HomePage = () => {
           api.get('/most-popular'),
           api.get('/content/countries'),
           api.get('/reviews?featured=1'),
+          api.get('/products?category=theme-cakes&limit=4'),
         ]);
 
         if (bannersRes.status === 'fulfilled' && bannersRes.value.data?.data) {
@@ -67,6 +133,9 @@ const HomePage = () => {
         }
         if (popRes.status === 'fulfilled' && popRes.value.data?.data) {
           setMostPopular(popRes.value.data.data);
+        }
+        if (themeCakesRes.status === 'fulfilled' && themeCakesRes.value.data?.data) {
+          setThemeCakes(themeCakesRes.value.data.data);
         }
         if (countriesRes.status === 'fulfilled' && countriesRes.value.data?.data) {
           setCountries(countriesRes.value.data.data);
@@ -109,7 +178,7 @@ const HomePage = () => {
         {loading && banners.length === 0 ? (
           <BannerSkeleton />
         ) : banners.length > 0 ? (
-          <div className="relative w-full h-[440px] sm:h-[500px] md:h-[560px] rounded-3xl overflow-hidden shadow-warm-lg bg-chocolate">
+          <div className="relative w-full h-[380px] sm:h-[440px] md:h-[480px] lg:h-[510px] rounded-2xl sm:rounded-3xl overflow-hidden shadow-warm-lg bg-chocolate">
             {banners.map((banner, idx) => (
               <div
                 key={banner.id || idx}
@@ -128,23 +197,24 @@ const HomePage = () => {
                   />
                 </picture>
                 <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/50 to-transparent flex items-center">
-                  <div className="max-w-xl p-8 sm:p-12 md:p-16 text-white space-y-4">
-                    <span className="inline-flex items-center gap-1.5 bg-amber-500/90 text-white font-bold text-xs uppercase tracking-widest px-3 py-1 rounded-full backdrop-blur-xs shadow-xs">
-                      <Sparkles className="w-3.5 h-3.5" /> Handcrafted Daily
+                  <div
+                    key={`${banner.id || idx}-${idx === currentBanner ? 'active' : 'inactive'}`}
+                    className="max-w-xl p-6 sm:p-9 md:p-12 lg:p-14 text-white space-y-3.5 sm:space-y-4 font-banner"
+                  >
+                    <span className="inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-bold text-[11px] sm:text-xs uppercase tracking-widest px-3 py-0.5 sm:px-3.5 sm:py-1 rounded-full backdrop-blur-xs shadow-md animate-banner-badge font-banner">
+                      <Sparkles className="w-3.5 h-3.5 animate-pulse text-amber-200" /> Handcrafted Daily
                     </span>
-                    <h1 className="font-serif text-3xl sm:text-4xl md:text-5xl font-bold leading-tight drop-shadow-sm">
-                      {banner.title}
-                    </h1>
-                    <p className="text-sm sm:text-base text-slate-200 leading-relaxed max-w-md line-clamp-3">
+                    <BannerTypewriter text={banner.title} isActive={idx === currentBanner} />
+                    <p className="text-xs sm:text-sm md:text-base text-slate-200 leading-relaxed max-w-md line-clamp-2 sm:line-clamp-3 font-medium drop-shadow-sm animate-banner-subtitle font-banner">
                       {banner.subtitle}
                     </p>
-                    <div className="pt-2">
+                    <div className="pt-1 sm:pt-2">
                       <Link
                         to={banner.button_url || '/category/cakes-pastries'}
-                        className="inline-flex items-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-bold text-sm sm:text-base px-6 py-3.5 rounded-full shadow-lg hover:shadow-xl hover:scale-102 transition-all"
+                        className="inline-flex items-center gap-2 bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 bg-[length:200%_auto] hover:bg-right hover:scale-105 text-chocolate font-extrabold text-xs sm:text-sm md:text-base px-5 sm:px-6 py-2.5 sm:py-3 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 animate-banner-btn group font-banner"
                       >
                         <span>{banner.button_text || 'Order Now'}</span>
-                        <ArrowRight className="w-4 h-4" />
+                        <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 group-hover:translate-x-1.5 transition-transform" />
                       </Link>
                     </div>
                   </div>
@@ -157,27 +227,27 @@ const HomePage = () => {
               <>
                 <button
                   onClick={prevBanner}
-                  className="absolute left-4 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full bg-white/30 hover:bg-white/80 text-white hover:text-chocolate backdrop-blur-md flex items-center justify-center transition-all shadow-md"
+                  className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 z-20 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/30 hover:bg-white/80 text-white hover:text-chocolate backdrop-blur-md flex items-center justify-center transition-all duration-200 shadow-md hover:scale-105 active:scale-95"
                   aria-label="Previous banner"
                 >
-                  <ChevronLeft className="w-6 h-6" />
+                  <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" strokeWidth={2.5} />
                 </button>
                 <button
                   onClick={nextBanner}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full bg-white/30 hover:bg-white/80 text-white hover:text-chocolate backdrop-blur-md flex items-center justify-center transition-all shadow-md"
+                  className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 z-20 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/30 hover:bg-white/80 text-white hover:text-chocolate backdrop-blur-md flex items-center justify-center transition-all duration-200 shadow-md hover:scale-105 active:scale-95"
                   aria-label="Next banner"
                 >
-                  <ChevronRight className="w-6 h-6" />
+                  <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" strokeWidth={2.5} />
                 </button>
 
                 {/* Dot indicators */}
-                <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2">
+                <div className="absolute bottom-3 sm:bottom-4 md:bottom-5 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 sm:gap-2">
                   {banners.map((_, i) => (
                     <button
                       key={i}
                       onClick={() => setCurrentBanner(i)}
-                      className={`h-2.5 rounded-full transition-all ${
-                        i === currentBanner ? 'w-8 bg-amber-400' : 'w-2.5 bg-white/50 hover:bg-white/80'
+                      className={`h-2 sm:h-2.5 rounded-full transition-all ${
+                        i === currentBanner ? 'w-6 sm:w-8 bg-amber-400' : 'w-2 sm:w-2.5 bg-white/50 hover:bg-white/80'
                       }`}
                       aria-label={`Go to slide ${i + 1}`}
                     />
@@ -189,7 +259,10 @@ const HomePage = () => {
         ) : null}
       </section>
 
-      {/* 2. ATTRACTIVE CAKE INTRODUCTION */}
+      {/* 2. CATEGORY IMAGES MOVING CAROUSEL (Interactive Showcase) */}
+      <CategoryImagesCarousel />
+
+      {/* 3. ATTRACTIVE CAKE INTRODUCTION */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="bg-gradient-to-br from-cream via-amber-50/50 to-cream rounded-3xl p-8 sm:p-12 md:p-16 border border-amber-200/60 shadow-warm relative overflow-hidden">
           <div className="absolute -right-16 -top-16 w-64 h-64 bg-amber-200/30 rounded-full blur-3xl pointer-events-none" />
@@ -295,10 +368,17 @@ const HomePage = () => {
 
               <div className="pt-2 flex flex-wrap items-center gap-4">
                 <Link
-                  to={dreamCake?.product?.slug ? `/cakes/${dreamCake.product.slug}` : '/cakes/signature-dream-cake'}
+                  to="/category/cakes-pastries?sub=something-special"
                   className="bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-chocolate font-bold text-sm sm:text-base px-7 py-3.5 rounded-full shadow-lg transition-transform hover:scale-105"
                 >
                   Order Dream Cake Now
+                </Link>
+                <Link
+                  to="/category/theme-cakes"
+                  className="inline-flex items-center gap-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-400/40 font-semibold text-sm px-6 py-3.5 rounded-full transition-colors"
+                >
+                  <span>Artisan Theme Cakes</span>
+                  <ArrowRight className="w-4 h-4" />
                 </Link>
                 <Link
                   to="/photo-cake"
@@ -325,7 +405,54 @@ const HomePage = () => {
         </div>
       </section>
 
-      {/* 5. EXPLORE OUR LATEST & GREATEST (New Arrivals & Most Popular) */}
+      {/* 5. ARTISAN HANDCRAFTED THEME CAKES SHOWCASE */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-8">
+          <div>
+            <div className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-amber-700 bg-amber-100/80 px-3 py-1 rounded-full mb-1.5">
+              <Crown className="w-3.5 h-3.5 text-amber-600" />
+              <span>Handcrafted 3D Designer Cakes</span>
+            </div>
+            <h2 className="font-serif text-2xl sm:text-3xl font-bold text-chocolate">
+              Artisan Theme Cakes
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-500">
+              Sculpted celebration showstoppers for birthdays, anniversaries, and milestone occasions
+            </p>
+          </div>
+          <Link
+            to="/category/theme-cakes"
+            className="inline-flex items-center gap-2 text-xs sm:text-sm font-bold text-amber-700 hover:text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-200/80 px-4 py-2 rounded-xl transition-all shadow-2xs self-start sm:self-auto"
+          >
+            <span>Explore All Theme Cakes</span>
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+
+        {loading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[...Array(4)].map((_, i) => (
+              <ProductCardSkeleton key={i} />
+            ))}
+          </div>
+        ) : themeCakes.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {themeCakes.slice(0, 4).map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-10 bg-amber-50/40 rounded-3xl border border-amber-100">
+            <Crown className="w-8 h-8 text-amber-500 mx-auto mb-2" />
+            <p className="text-sm font-bold text-chocolate">Artisan Theme Cakes in the Oven</p>
+            <Link to="/category/theme-cakes" className="text-xs text-amber-700 font-semibold underline mt-1 inline-block">
+              View Theme Cakes Catalog →
+            </Link>
+          </div>
+        )}
+      </section>
+
+      {/* 6. EXPLORE OUR LATEST & GREATEST (New Arrivals & Most Popular) */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-2xl mx-auto mb-8 space-y-2">
           <span className="text-xs font-bold uppercase tracking-widest text-amber-600">

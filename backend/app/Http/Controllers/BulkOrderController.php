@@ -238,6 +238,27 @@ class BulkOrderController extends Controller
             'status' => 'pending',
         ]);
 
+        // Forward bulk order enquiry to administrator email
+        try {
+            $destEmail = 'mkumar200418@gmail.com';
+            $subjectLine = 'Ammas Pastries - New Corporate Bulk Order Enquiry from ' . $validated['name'];
+            $emailBody = "Hello Admin,\n\n"
+                       . "A new bulk cake/catering order enquiry has been submitted:\n\n"
+                       . "• Name: {$validated['name']}\n"
+                       . "• Email: {$validated['email']}\n"
+                       . "• Phone: {$validated['phone']}\n"
+                       . "• Message:\n{$validated['message']}\n\n"
+                       . "Received At: " . now()->toDayDateTimeString() . "\n";
+
+            \Illuminate\Support\Facades\Mail::raw($emailBody, function ($msg) use ($destEmail, $subjectLine, $validated) {
+                $msg->to($destEmail)
+                    ->replyTo($validated['email'], $validated['name'])
+                    ->subject($subjectLine);
+            });
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Bulk order email failed: ' . $e->getMessage());
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Thank you! Your bulk order enquiry has been received. Our executive will call you within 2 hours.',

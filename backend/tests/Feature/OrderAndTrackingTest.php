@@ -99,4 +99,51 @@ class OrderAndTrackingTest extends TestCase
                 ]
             ]);
     }
+
+    public function test_order_remains_pending_until_online_payment_verification_is_successful(): void
+    {
+        $payload = [
+            'outlet_id' => $this->outlet->id,
+            'customer_name' => 'Priya Nair',
+            'customer_phone' => '9999988888',
+            'customer_email' => 'priya@example.com',
+            'delivery_address' => '45 Residency Road',
+            'delivery_area' => 'Residency Road',
+            'delivery_city' => 'Bengaluru',
+            'delivery_pincode' => '560025',
+            'delivery_date' => date('Y-m-d'),
+            'delivery_time_slot' => '05:00 PM - 08:00 PM',
+            'items' => [
+                [
+                    'product_id' => $this->product->id,
+                    'quantity' => 1,
+                ]
+            ]
+        ];
+
+        $response = $this->postJson('/api/orders/create', $payload);
+        $response->assertStatus(201);
+
+        $orderId = $response->json('data.order_id');
+        $order = \App\Models\Order::findOrFail($orderId);
+
+        $this->assertSame('pending', $order->payment_status);
+        $this->assertSame('pending_payment', $order->order_status);
+
+        $paymentResponse = $this->postJson('/api/payments/razorpay/verify', [
+            'order_id' => $orderId,
+            'razorpay_order_id' => 'order_test_' . $order->order_number,
+            'razorpay_payment_id' => 'pay_test_123456',
+            'razorpay_signature' => 'sig_test_sandbox_verified',
+        ]);
+
+        $paymentResponse->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+            ]);
+
+        $order->refresh();
+        $this->assertSame('paid', $order->payment_status);
+        $this->assertSame('confirmed', $order->order_status);
+    }
 }

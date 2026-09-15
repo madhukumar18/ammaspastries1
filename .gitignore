@@ -1,5 +1,6 @@
 # Dependencies
 backend/vendor/
+vendor/
 frontend/node_modules/
 node_modules/
 

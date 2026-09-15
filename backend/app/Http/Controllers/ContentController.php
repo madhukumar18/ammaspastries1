@@ -8,6 +8,7 @@ use App\Models\Country;
 use App\Models\Policy;
 use App\Models\Setting;
 use App\Models\Coupon;
+use App\Models\CategoryImage;
 
 class ContentController extends Controller
 {
@@ -35,6 +36,33 @@ class ContentController extends Controller
         return response()->json([
             'success' => true,
             'data' => $banners,
+        ]);
+    }
+
+    // Active Category Images Showcase
+    public function categoryImages()
+    {
+        $categoryImages = CategoryImage::where('is_active', true)
+            ->orderBy('display_order', 'asc')
+            ->orderBy('id', 'asc')
+            ->get();
+
+        $settings = [
+            'badge_text' => Setting::getVal('category_carousel_badge', 'Explore Bakery Specialties'),
+            'title' => Setting::getVal('category_carousel_title', 'Fresh Confectionery Categories'),
+            'subtitle' => Setting::getVal('category_carousel_subtitle', 'Click any category to order fresh artisan creations'),
+            'auto_scroll' => filter_var(Setting::getVal('category_carousel_auto_scroll', 'true'), FILTER_VALIDATE_BOOLEAN),
+            'scroll_speed' => (float) Setting::getVal('category_carousel_speed', 0.85),
+            'pause_on_hover' => filter_var(Setting::getVal('category_carousel_pause_on_hover', 'true'), FILTER_VALIDATE_BOOLEAN),
+            'show_arrows' => filter_var(Setting::getVal('category_carousel_show_arrows', 'true'), FILTER_VALIDATE_BOOLEAN),
+            'show_bottom_hint' => filter_var(Setting::getVal('category_carousel_show_hint', 'true'), FILTER_VALIDATE_BOOLEAN),
+            'bottom_hint' => Setting::getVal('category_carousel_hint_text', 'Click any category circle to browse full catalog'),
+        ];
+
+        return response()->json([
+            'success' => true,
+            'data' => $categoryImages,
+            'settings' => $settings,
         ]);
     }
 
@@ -95,7 +123,7 @@ class ContentController extends Controller
             'success' => true,
             'data' => [
                 'phone' => Setting::getVal('contact_phone', '+91 80 4567 8900'),
-                'email' => Setting::getVal('contact_email', 'care@ammaspastries.in'),
+                'email' => Setting::getVal('contact_email', 'mkumar200418@gmail.com'),
                 'address' => Setting::getVal('contact_address', 'Ammas Pastries Central Kitchen, MG Road, Bengaluru, Karnataka 560001'),
                 'hours' => 'Monday - Sunday: 10:00 AM - 10:00 PM',
             ]
@@ -137,5 +165,30 @@ class ContentController extends Controller
                 'description' => $coupon->description,
             ]
         ]);
+    }
+
+    // Google Geocoding Proxy Fallback
+    public function geocode(Request $request)
+    {
+        $address = $request->query('address');
+        $latlng = $request->query('latlng');
+        $apiKey = env('GOOGLE_GEOCODING_API_KEY', '***REMOVED_GOOGLE_API_KEY***');
+
+        $params = ['key' => $apiKey];
+        if ($address) {
+            $params['address'] = $address;
+            $params['components'] = 'country:IN';
+        } elseif ($latlng) {
+            $params['latlng'] = $latlng;
+        } else {
+            return response()->json(['success' => false, 'message' => 'address or latlng required'], 422);
+        }
+
+        try {
+            $res = \Illuminate\Support\Facades\Http::withoutVerifying()->timeout(10)->get('https://maps.googleapis.com/maps/api/geocode/json', $params);
+            return response()->json($res->json(), $res->status());
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
     }
 }

@@ -1,5 +1,12 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import api from '../services/api';
+import {
+  reverseGeocode,
+  findNearestOutlet,
+  calculateDistanceKm,
+  getOutletCoordinates,
+  OUTLET_COORDINATES,
+} from '../services/geocodingService.js';
 
 const AppContext = createContext(null);
 
@@ -10,6 +17,15 @@ export const AppProvider = ({ children }) => {
     const saved = localStorage.getItem('ammas_selected_outlet');
     return saved ? JSON.parse(saved) : null;
   });
+
+  // User live location state
+  const [userLocation, setUserLocation] = useState(() => {
+    const saved = localStorage.getItem('ammas_user_location');
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [userDistance, setUserDistance] = useState(null);
+  const [isLocatingUser, setIsLocatingUser] = useState(false);
+  const [locationPromptOpen, setLocationPromptOpen] = useState(false);
 
   // Delivery Bar Info (from database settings)
   const [deliveryInfo, setDeliveryInfo] = useState({
@@ -77,6 +93,24 @@ export const AppProvider = ({ children }) => {
     }
   }, [selectedOutlet]);
 
+  // Sync User Location to localStorage
+  useEffect(() => {
+    if (userLocation) {
+      localStorage.setItem('ammas_user_location', JSON.stringify(userLocation));
+    }
+  }, [userLocation]);
+
+  // Recalculate distance whenever userLocation or selectedOutlet changes
+  useEffect(() => {
+    if (userLocation?.lat && userLocation?.lng && selectedOutlet) {
+      const coords = getOutletCoordinates(selectedOutlet);
+      if (coords) {
+        const dist = calculateDistanceKm(userLocation.lat, userLocation.lng, coords.lat, coords.lng);
+        setUserDistance(dist);
+      }
+    }
+  }, [userLocation, selectedOutlet]);
+
   // Fetch Outlets & Delivery Bar Settings on mount
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -92,6 +126,14 @@ export const AppProvider = ({ children }) => {
           if (!selectedOutlet && list.length > 0) {
             setSelectedOutlet(list[0]);
           }
+
+          // Check if location prompt should show on first website visit
+          const hasSeenPrompt = localStorage.getItem('ammas_location_prompt_seen');
+          if (!hasSeenPrompt) {
+            setTimeout(() => {
+              setLocationPromptOpen(true);
+            }, 600);
+          }
         }
 
         if (settingsRes.status === 'fulfilled' && settingsRes.value.data?.data) {
@@ -103,6 +145,90 @@ export const AppProvider = ({ children }) => {
     };
     fetchInitialData();
   }, []);
+
+  // Detect User Live Location via GPS & Set Nearest Outlet
+  const detectUserLocation = useCallback(
+    async ({ silent = false, showToastOnSuccess = true } = {}) => {
+      if (!navigator.geolocation) {
+        if (!silent) showToast('Geolocation is not supported by your browser.', 'error');
+        return { success: false, message: 'Geolocation not supported' };
+      }
+
+      setIsLocatingUser(true);
+
+      return new Promise((resolve) => {
+        navigator.geolocation.getCurrentPosition(
+          async (pos) => {
+            try {
+              const lat = pos.coords.latitude;
+              const lng = pos.coords.longitude;
+              const geoRes = await reverseGeocode(lat, lng);
+
+              const locData = {
+                lat,
+                lng,
+                area: geoRes.area || 'Detected Area',
+                city: geoRes.city || 'Bengaluru',
+                pincode: geoRes.pincode || '',
+                formattedAddress: geoRes.formattedAddress || '',
+              };
+              setUserLocation(locData);
+              localStorage.setItem('ammas_user_location', JSON.stringify(locData));
+              localStorage.setItem('ammas_location_prompt_seen', 'true');
+
+              // Find nearest outlet
+              const nearest = findNearestOutlet(lat, lng, outlets);
+              if (nearest?.outlet) {
+                setSelectedOutlet(nearest.outlet);
+                setUserDistance(nearest.distanceKm);
+                localStorage.setItem('ammas_selected_outlet', JSON.stringify(nearest.outlet));
+
+                if (showToastOnSuccess) {
+                  showToast(
+                    `Nearest Outlet: ${nearest.outlet.name} (${nearest.distanceKm} km away) 📍`,
+                    'success'
+                  );
+                }
+
+                setIsLocatingUser(false);
+                resolve({
+                  success: true,
+                  location: locData,
+                  nearestOutlet: nearest.outlet,
+                  distanceKm: nearest.distanceKm,
+                });
+                return;
+              }
+
+              setIsLocatingUser(false);
+              resolve({ success: true, location: locData });
+            } catch (err) {
+              console.error('Error resolving GPS location:', err);
+              setIsLocatingUser(false);
+              if (!silent) showToast('Could not resolve address details from GPS.', 'warning');
+              resolve({ success: false, error: err });
+            }
+          },
+          (err) => {
+            console.warn('Geolocation error:', err);
+            setIsLocatingUser(false);
+            if (!silent) {
+              showToast('Location permission not granted. You can select your outlet manually.', 'info');
+            }
+            resolve({ success: false, code: err.code, message: err.message });
+          },
+          { timeout: 10000, enableHighAccuracy: true }
+        );
+      });
+    },
+    [outlets]
+  );
+
+  const openLocationPrompt = () => setLocationPromptOpen(true);
+  const closeLocationPrompt = () => {
+    setLocationPromptOpen(false);
+    localStorage.setItem('ammas_location_prompt_seen', 'true');
+  };
 
   // Cart operations
   const addToCart = (product, variant = null, quantity = 1, customization = null) => {
@@ -253,6 +379,15 @@ export const AppProvider = ({ children }) => {
         adminToken,
         loginAdmin,
         logoutAdmin,
+        userLocation,
+        setUserLocation,
+        userDistance,
+        isLocatingUser,
+        locationPromptOpen,
+        setLocationPromptOpen,
+        openLocationPrompt,
+        closeLocationPrompt,
+        detectUserLocation,
         toasts,
         showToast,
         removeToast,

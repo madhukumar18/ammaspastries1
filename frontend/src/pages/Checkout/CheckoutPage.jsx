@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import api from '../../services/api';
+import ProductCarousel from '../../components/UI/ProductCarousel';
+import DeliveryAddressSelector from '../../components/Address/DeliveryAddressSelector';
 import {
   ShieldCheck,
   Truck,
@@ -11,8 +13,35 @@ import {
   ArrowRight,
   Store,
   Lock,
-  UserCheck
+  UserCheck,
+  CreditCard,
+  Smartphone,
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
+
+// Dynamic loader to guarantee Razorpay script is present
+const loadRazorpayScript = () => {
+  return new Promise((resolve) => {
+    if (window.Razorpay) {
+      resolve(true);
+      return;
+    }
+    const existing = document.querySelector('script[src="https://checkout.razorpay.com/v1/checkout.js"]');
+    if (existing) {
+      existing.onload = () => resolve(true);
+      existing.onerror = () => resolve(false);
+      if (window.Razorpay) resolve(true);
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+};
 
 const CheckoutPage = () => {
   const navigate = useNavigate();
@@ -44,7 +73,29 @@ const CheckoutPage = () => {
   const [timeSlot, setTimeSlot] = useState('45 Mins - 1 Hour (Instant)');
   const [specialInstructions, setSpecialInstructions] = useState('');
 
+  // Payment option
+  const [paymentMethod, setPaymentMethod] = useState('razorpay');
+
   const [isProcessing, setIsProcessing] = useState(false);
+  const [relatedProducts, setRelatedProducts] = useState([]);
+
+  useEffect(() => {
+    const fetchRelated = async () => {
+      try {
+        const catSlug = cart[0]?.product?.category?.slug || 'cakes-pastries';
+        const res = await api.get(`/products?category=${catSlug}&per_page=10`);
+        if (res.data?.data) {
+          const cartProductIds = cart.map((item) => item.product?.id);
+          const filtered = res.data.data.filter((p) => !cartProductIds.includes(p.id));
+          setRelatedProducts(filtered.length > 0 ? filtered : res.data.data);
+        }
+      } catch (err) {
+        console.warn('Failed to load related products for checkout:', err);
+      }
+    };
+
+    fetchRelated();
+  }, [cart[0]?.product?.category?.slug]);
 
   if (cart.length === 0) {
     return (
@@ -76,9 +127,9 @@ const CheckoutPage = () => {
     try {
       // 1. Format payload for Laravel backend
       const itemsPayload = cart.map((item) => ({
-        product_id: item.product.id,
+        product_id: item.product?.id || item.productId || item.id,
         variant_id: item.variant?.id || null,
-        quantity: item.quantity,
+        quantity: parseInt(item.quantity, 10) || 1,
         customization: item.customization || null,
       }));
 
@@ -113,13 +164,19 @@ const CheckoutPage = () => {
       });
 
       const paymentData = paymentRes.data?.data;
+      const isMockSimulation = Boolean(
+        paymentData?.is_mock_simulation ||
+        (!paymentData?.razorpay_order_id?.startsWith('order_') && paymentData?.is_test_mode)
+      );
 
-      // 4. Handle Razorpay Checkout
-      if (window.Razorpay && !paymentData.is_test_mode) {
+      // 4. Handle Razorpay Checkout Modal
+      const rzpLoaded = await loadRazorpayScript();
+
+      if (rzpLoaded && window.Razorpay && !isMockSimulation) {
         const options = {
           key: paymentData.key_id,
           amount: paymentData.amount,
-          currency: paymentData.currency,
+          currency: paymentData.currency || 'INR',
           name: 'Ammas Pastries',
           description: `Order #${createdOrder.order_number}`,
           image: 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=100',
@@ -127,6 +184,7 @@ const CheckoutPage = () => {
           handler: async (response) => {
             // Verify signature on backend
             try {
+              showToast('Verifying payment with bank...', 'info');
               const verifyRes = await api.post('/payments/razorpay/verify', {
                 order_id: createdOrder.order_id,
                 razorpay_order_id: response.razorpay_order_id,
@@ -137,29 +195,44 @@ const CheckoutPage = () => {
               if (verifyRes.data?.success) {
                 clearCart();
                 navigate(`/order-confirmation/${createdOrder.order_number}`);
+              } else {
+                showToast(verifyRes.data?.message || 'Payment verification failed.', 'error');
               }
             } catch (vErr) {
               showToast('Payment verification error. Please contact bakery support.', 'error');
+            } finally {
+              setIsProcessing(false);
             }
           },
           prefill: {
             name: customerName,
-            email: customerEmail,
+            email: customerEmail || 'mkumar200418@gmail.com',
             contact: customerPhone,
+          },
+          notes: {
+            order_number: createdOrder.order_number,
+            outlet: selectedOutlet?.name,
           },
           theme: {
             color: '#3D2314',
+          },
+          modal: {
+            ondismiss: () => {
+              setIsProcessing(false);
+              showToast('Payment window closed. You can retry paying whenever you are ready.', 'info');
+            },
           },
         };
 
         const rzp = new window.Razorpay(options);
         rzp.on('payment.failed', function (resp) {
-          showToast(`Payment failed: ${resp.error.description}`, 'error');
+          setIsProcessing(false);
+          showToast(`Payment failed: ${resp.error?.description || 'Transaction declined'}`, 'error');
         });
         rzp.open();
       } else {
-        // Safe local test / sandbox simulation
-        showToast('Processing test order with Razorpay sandbox...', 'info');
+        // Safe local test / sandbox simulation fallback
+        showToast('Processing test order with Razorpay sandbox simulation...', 'info');
         const verifyRes = await api.post('/payments/razorpay/verify', {
           order_id: createdOrder.order_id,
           razorpay_order_id: paymentData.razorpay_order_id,
@@ -171,17 +244,17 @@ const CheckoutPage = () => {
           clearCart();
           navigate(`/order-confirmation/${createdOrder.order_number}`);
         }
+        setIsProcessing(false);
       }
     } catch (err) {
       showToast(err.friendlyMessage || err.message || 'Unable to place order. Please try again.', 'error');
-    } finally {
       setIsProcessing(false);
     }
   };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      
+
       <div className="pb-4 border-b border-slate-100 flex items-center justify-between">
         <div>
           <h1 className="font-serif text-2xl sm:text-3xl font-bold text-chocolate">
@@ -197,10 +270,10 @@ const CheckoutPage = () => {
       </div>
 
       <form onSubmit={handlePlaceOrder} className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
-        
+
         {/* Left Form (7 cols) */}
         <div className="lg:col-span-7 space-y-6">
-          
+
           {/* Section 1: Customer Contact Info */}
           <div className="bg-white rounded-3xl p-6 sm:p-8 border border-amber-100 shadow-xs space-y-4">
             <h2 className="font-serif font-bold text-base text-chocolate flex items-center gap-2">
@@ -246,85 +319,21 @@ const CheckoutPage = () => {
             </div>
           </div>
 
-          {/* Section 2: Delivery Address & Outlet Selection */}
-          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-amber-100 shadow-xs space-y-4">
-            <h2 className="font-serif font-bold text-base text-chocolate flex items-center gap-2">
-              <MapPin className="w-4 h-4 text-amber-600" />
-              <span>2. Delivery Address & Bakery Outlet</span>
-            </h2>
-
-            {/* Serving Outlet dropdown */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Select Serving Outlet *</label>
-              <select
-                value={selectedOutlet?.id || ''}
-                onChange={(e) => {
-                  const out = outlets.find((o) => o.id === parseInt(e.target.value));
-                  if (out) {
-                    setSelectedOutlet(out);
-                    setArea(out.area);
-                    setPincode(out.pincode);
-                  }
-                }}
-                className="w-full text-xs p-3 rounded-xl border border-slate-200 font-semibold text-chocolate focus:outline-none focus:border-amber-500"
-              >
-                {outlets.map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.name} — {o.address} ({o.opening_time} - {o.closing_time})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Complete Delivery Address *</label>
-                <textarea
-                  required
-                  rows={2}
-                  value={addressLine1}
-                  onChange={(e) => setAddressLine1(e.target.value)}
-                  placeholder="Flat / House No., Apartment name, Street name, Landmark..."
-                  className="w-full text-xs p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Area / Locality *</label>
-                  <input
-                    type="text"
-                    required
-                    value={area}
-                    onChange={(e) => setArea(e.target.value)}
-                    className="w-full text-xs p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">City *</label>
-                  <input
-                    type="text"
-                    required
-                    value={city}
-                    onChange={(e) => setCity(e.target.value)}
-                    className="w-full text-xs p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Pincode *</label>
-                  <input
-                    type="text"
-                    required
-                    value={pincode}
-                    onChange={(e) => setPincode(e.target.value)}
-                    className="w-full text-xs p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
+          {/* Section 2: Delivery Address & Outlet Selection (Google Geocoding & Manual Fallback) */}
+          <DeliveryAddressSelector
+            addressLine1={addressLine1}
+            setAddressLine1={setAddressLine1}
+            area={area}
+            setArea={setArea}
+            city={city}
+            setCity={setCity}
+            pincode={pincode}
+            setPincode={setPincode}
+            selectedOutlet={selectedOutlet}
+            setSelectedOutlet={setSelectedOutlet}
+            outlets={outlets}
+            showToast={showToast}
+          />
 
           {/* Section 3: Delivery Schedule */}
           <div className="bg-white rounded-3xl p-6 sm:p-8 border border-amber-100 shadow-xs space-y-4">
@@ -371,6 +380,101 @@ const CheckoutPage = () => {
                   placeholder="e.g. Ring bell twice, deliver to security guard, don't tilt box"
                   className="w-full text-xs p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500"
                 />
+              </div>
+            </div>
+          </div>
+
+          {/* Section 4: Payment Method Selection */}
+          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-amber-100 shadow-xs space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-serif font-bold text-base text-chocolate flex items-center gap-2">
+                <CreditCard className="w-4 h-4 text-amber-600" />
+                <span>4. Payment Method</span>
+              </h2>
+              <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full flex items-center gap-1">
+                <ShieldCheck className="w-3 h-3" /> 100% Encrypted
+              </span>
+            </div>
+
+            <div className="space-y-3">
+              {/* Option 1: Razorpay (Active) */}
+              <div
+                onClick={() => setPaymentMethod('razorpay')}
+                className={`p-4 rounded-2xl border-2 transition-all cursor-pointer ${
+                  paymentMethod === 'razorpay'
+                    ? 'border-emerald-600 bg-emerald-50/30'
+                    : 'border-slate-200 hover:border-amber-300'
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <input
+                    type="radio"
+                    name="payment_method"
+                    id="method_razorpay"
+                    checked={paymentMethod === 'razorpay'}
+                    onChange={() => setPaymentMethod('razorpay')}
+                    className="mt-1 text-emerald-600 focus:ring-emerald-500 accent-emerald-600"
+                  />
+                  <div className="flex-1 space-y-2">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <label htmlFor="method_razorpay" className="font-bold text-xs sm:text-sm text-chocolate cursor-pointer">
+                        Online Payment via Razorpay (UPI, Cards, NetBanking, Wallets)
+                      </label>
+                      <span className="text-[10px] bg-emerald-600 text-white font-bold px-2 py-0.5 rounded-full">
+                        Instant Confirmation
+                      </span>
+                    </div>
+
+                    <p className="text-[11px] sm:text-xs text-slate-500">
+                      When you click <strong>Pay Securely</strong>, the Razorpay window will open where you can select your preferred payment mode (Google Pay, PhonePe, Paytm, Credit/Debit Card, or NetBanking).
+                    </p>
+
+                    {/* Visual Badges for Supported Instruments */}
+                    <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold bg-white border border-slate-200 text-slate-700 px-2.5 py-1 rounded-lg shadow-2xs">
+                        <Smartphone className="w-3.5 h-3.5 text-emerald-600" />
+                        UPI (GPay / PhonePe / Paytm / QR)
+                      </span>
+                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold bg-white border border-slate-200 text-slate-700 px-2.5 py-1 rounded-lg shadow-2xs">
+                        <CreditCard className="w-3.5 h-3.5 text-blue-600" />
+                        Cards (Visa / MasterCard / RuPay)
+                      </span>
+                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold bg-white border border-slate-200 text-slate-700 px-2.5 py-1 rounded-lg shadow-2xs">
+                        🏛️ NetBanking (50+ Banks)
+                      </span>
+                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold bg-white border border-slate-200 text-slate-700 px-2.5 py-1 rounded-lg shadow-2xs">
+                        👛 Wallets
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Option 2: Cash on Delivery (Disabled for perishable cakes) */}
+              <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/70 opacity-70">
+                <div className="flex items-start gap-3">
+                  <input
+                    type="radio"
+                    name="payment_method"
+                    id="method_cod"
+                    disabled
+                    checked={false}
+                    className="mt-1 text-slate-400"
+                  />
+                  <div className="flex-1 space-y-1">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <label htmlFor="method_cod" className="font-semibold text-xs sm:text-sm text-slate-500 cursor-not-allowed">
+                        Cash on Delivery (Unavailable)
+                      </label>
+                      <span className="text-[10px] bg-slate-200 text-slate-600 font-semibold px-2 py-0.5 rounded-full">
+                        Online Prepaid Only
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400">
+                      Ammas Pastries bakes fresh cakes strictly to order. 100% online prepayment is required to prevent cake spoilage and confirm delivery slot.
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -427,14 +531,27 @@ const CheckoutPage = () => {
               </div>
             </div>
 
+            {/* Payment Mode Indicator */}
+            <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100 flex items-center justify-between text-xs">
+              <span className="text-slate-600 font-medium">Selected Mode:</span>
+              <span className="font-bold text-emerald-800 flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                Razorpay (UPI / Cards)
+              </span>
+            </div>
+
             {/* Pay Button */}
             <button
               type="submit"
               disabled={isProcessing}
-              className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-700 to-emerald-600 hover:from-emerald-800 hover:to-emerald-700 text-white font-bold text-sm py-4 rounded-2xl shadow-md transition-all active:scale-98 disabled:opacity-50"
+              className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-700 to-emerald-600 hover:from-emerald-800 hover:to-emerald-700 text-white font-bold text-sm py-4 rounded-2xl shadow-md transition-all active:scale-98 disabled:opacity-50 cursor-pointer"
             >
               <Lock className="w-4 h-4" />
-              <span>{isProcessing ? 'Processing Secure Payment...' : 'Pay with Razorpay'}</span>
+              <span>
+                {isProcessing
+                  ? 'Opening Payment Gateway...'
+                  : `Pay ₹${Math.max(0, cartSubtotal - (couponData?.discount || 0) + (cartSubtotal >= 1000 ? 0 : 50) + Math.round((cartSubtotal - (couponData?.discount || 0)) * 0.05))} Securely`}
+              </span>
             </button>
 
             <div className="pt-2 text-center text-[11px] text-slate-400 space-y-1">
@@ -442,12 +559,31 @@ const CheckoutPage = () => {
                 <ShieldCheck className="w-4 h-4" />
                 <span>HMAC SHA256 Verified Payment Gateway</span>
               </div>
-              <div>Supports UPI, Cards, NetBanking, Razorpay Wallet</div>
+              <div>Choose UPI (GPay/PhonePe), Card, or NetBanking in the next step</div>
             </div>
           </div>
         </div>
 
       </form>
+
+      {/* Related Products Carousel for Celebration Add-ons */}
+      {relatedProducts.length > 0 && (
+        <div className="pt-6">
+          <ProductCarousel
+            products={relatedProducts}
+            title="Complete Your Celebration: Related Treats"
+            subtitle="Frequently ordered together • Same instant Add to Cart & Order actions"
+            badgeText="Add More To Your Celebration"
+            onAddToCart={(product, variant) => {
+              addToCart(product, variant, 1);
+            }}
+            onOrderNow={(product, variant) => {
+              addToCart(product, variant, 1);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          />
+        </div>
+      )}
 
     </div>
   );

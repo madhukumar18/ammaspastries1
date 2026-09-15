@@ -14,7 +14,7 @@ const AdminSettingsPage = () => {
     delivery_end_time: '10:00 PM',
     free_delivery_threshold: '1000',
     support_phone: '+91 98450 12345',
-    support_email: 'care@ammaspastries.in',
+    support_email: 'mkumar200418@gmail.com',
     gst_number: '29ABCDE1234F1Z5',
   });
   const [savingSettings, setSavingSettings] = useState(false);
@@ -200,7 +200,7 @@ const AdminSettingsPage = () => {
                   type="email"
                   value={settings.support_email}
                   onChange={(e) => setSettings({ ...settings, support_email: e.target.value })}
-                  placeholder="care@ammaspastries.in"
+                  placeholder="mkumar200418@gmail.com"
                   className="w-full px-3 py-2 border border-cream-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-bakery-500"
                 />
               </div>

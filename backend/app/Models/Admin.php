@@ -17,11 +17,14 @@ class Admin extends Authenticatable
         'role_id',
         'role',
         'is_active',
+        'otp_code',
+        'otp_expires_at',
     ];
 
     protected $hidden = [
         'password',
         'remember_token',
+        'otp_code',
     ];
 
     protected function casts(): array
@@ -29,6 +32,7 @@ class Admin extends Authenticatable
         return [
             'password' => 'hashed',
             'is_active' => 'boolean',
+            'otp_expires_at' => 'datetime',
         ];
     }
 

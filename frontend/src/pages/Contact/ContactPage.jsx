@@ -92,7 +92,9 @@ const ContactPage = () => {
                 </div>
                 <div>
                   <div className="text-slate-400 font-semibold text-[11px]">Email Care</div>
-                  <div className="font-bold text-chocolate text-sm mt-0.5">care@ammaspastries.in</div>
+                  <a href="mailto:mkumar200418@gmail.com" className="font-bold text-chocolate hover:text-amber-800 text-sm mt-0.5 block transition-colors">
+                    mkumar200418@gmail.com
+                  </a>
                   <div className="text-[11px] text-slate-400">Responses within 2 hours</div>
                 </div>
               </div>

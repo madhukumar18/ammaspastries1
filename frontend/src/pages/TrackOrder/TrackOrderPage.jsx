@@ -79,7 +79,7 @@ const TrackOrderPage = () => {
                 required
                 value={orderNumber}
                 onChange={(e) => setOrderNumber(e.target.value.toUpperCase())}
-                placeholder="e.g. AMP2609100001"
+                placeholder="e.g. 62473"
                 className="w-full text-xs p-3 rounded-xl border border-slate-200 font-mono font-bold text-chocolate uppercase focus:outline-none focus:border-amber-500"
               />
             </div>

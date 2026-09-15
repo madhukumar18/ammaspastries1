@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
+const API_BASE_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || 'http://127.0.0.1:8000/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -14,16 +14,17 @@ const api = axios.create({
 // Request interceptor to attach bearer token for customer or admin
 api.interceptors.request.use(
   (config) => {
-    // Check if request is for admin endpoints
-    if (config.url && config.url.includes('/admin')) {
-      const adminToken = localStorage.getItem('ammas_admin_token');
-      if (adminToken) {
-        config.headers.Authorization = `Bearer ${adminToken}`;
-      }
-    } else {
-      const userToken = localStorage.getItem('ammas_user_token');
-      if (userToken) {
-        config.headers.Authorization = `Bearer ${userToken}`;
+    if (typeof window !== 'undefined' && window.localStorage) {
+      if (config.url && config.url.includes('/admin')) {
+        const adminToken = localStorage.getItem('ammas_admin_token');
+        if (adminToken) {
+          config.headers.Authorization = `Bearer ${adminToken}`;
+        }
+      } else {
+        const userToken = localStorage.getItem('ammas_user_token');
+        if (userToken) {
+          config.headers.Authorization = `Bearer ${userToken}`;
+        }
       }
     }
     return config;

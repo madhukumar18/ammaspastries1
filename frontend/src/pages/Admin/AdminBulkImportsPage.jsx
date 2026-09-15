@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 import { useApp } from '../../context/AppContext';
 import { FileSpreadsheet, Building2, Calendar, Phone, Mail, CheckCircle, Clock, Eye, Trash2 } from 'lucide-react';
+import AdminBulkProductsPage from './AdminBulkProductsPage';
 
 const AdminBulkImportsPage = () => {
   const { showToast } = useApp();
+  const [activeTab, setActiveTab] = useState('products'); // 'products' | 'corporate'
   const [bulkOrders, setBulkOrders] = useState([]);
   const [imports, setImports] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -88,13 +90,43 @@ const AdminBulkImportsPage = () => {
   };
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-serif font-bold text-gray-900">Corporate & Bulk Orders</h1>
-        <p className="text-sm text-gray-500">
-          Manage B2B enquiries, institutional celebratory cake orders, and view uploaded CSV batches.
-        </p>
+    <div className="space-y-6">
+      {/* Top Tab Switcher */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-3">
+        <button
+          onClick={() => setActiveTab('products')}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+            activeTab === 'products'
+              ? 'bg-amber-600 text-white shadow-xs'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          }`}
+        >
+          <FileSpreadsheet className="w-4 h-4" />
+          <span>Product Catalog Bulk CSV (Add & Update Live Products)</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('corporate')}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+            activeTab === 'corporate'
+              ? 'bg-amber-600 text-white shadow-xs'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          }`}
+        >
+          <Building2 className="w-4 h-4" />
+          <span>Corporate B2B Customer Orders ({bulkOrders.length})</span>
+        </button>
       </div>
+
+      {activeTab === 'products' ? (
+        <AdminBulkProductsPage />
+      ) : (
+        <div className="space-y-8">
+          <div>
+            <h1 className="text-2xl font-serif font-bold text-gray-900">Corporate & Bulk Orders</h1>
+            <p className="text-sm text-gray-500">
+              Manage B2B enquiries, institutional celebratory cake orders, and view uploaded CSV batches.
+            </p>
+          </div>
 
       {/* CSV IMPORTS SUMMARY TABLE */}
       {imports.length > 0 && (
@@ -317,6 +349,8 @@ const AdminBulkImportsPage = () => {
               </form>
             </div>
           </div>
+        </div>
+      )}
         </div>
       )}
     </div>

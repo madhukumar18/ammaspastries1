@@ -50,6 +50,8 @@ class AuthController extends Controller
         $user = User::where('email', $validated['email'])->first();
 
         if (!$user || !Hash::check($validated['password'], $user->password)) {
+            \App\Services\SecurityLoggerService::logAuthFailure($request, $validated['email'], 'Invalid customer email or password');
+
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid email or password. Please try again.',

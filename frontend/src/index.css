@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -10,6 +12,48 @@
 
   h1, h2, h3, .font-serif {
     font-family: 'Playfair Display', Georgia, serif;
+  }
+}
+
+/* =========================================================
+   CUSTOM CAKE & BAKERY CURSOR SYSTEM
+   ========================================================= */
+@media (pointer: fine) {
+  html, body, #root {
+    cursor: url('/cursors/cake-cursor.svg') 2 1, auto;
+  }
+
+  /* Interactive Elements: Cupcake pointer with cherry & sparkles */
+  a,
+  button,
+  [role="button"],
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"],
+  select,
+  summary,
+  .cursor-pointer,
+  [clickable="true"] {
+    cursor: url('/cursors/cake-pointer.svg') 4 2, pointer !important;
+  }
+
+  /* Standard text input cursor for accessibility & ease of editing */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="search"],
+  input[type="tel"],
+  input[type="url"],
+  textarea,
+  [contenteditable="true"] {
+    cursor: text !important;
+  }
+
+  button:disabled,
+  input:disabled,
+  .cursor-not-allowed {
+    cursor: not-allowed !important;
   }
 }
 
@@ -45,4 +89,84 @@
 
 .animate-pulse-subtle {
   animation: pulse-subtle 3s ease-in-out infinite;
+}
+
+/* Banner Text Animations - Small, Subtle, and Slow */
+@keyframes bannerFadeInDown {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes bannerFadeInUp {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes bannerShimmer {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* Bricolage Grotesque Font for Banner Text */
+.bricolage-grotesque,
+.bricolage-grotesque-banner,
+.font-banner,
+.banner-text,
+.banner-title,
+[class*="bricolage-grotesque"] {
+  font-family: "Bricolage Grotesque", sans-serif !important;
+  font-optical-sizing: auto;
+  font-style: normal;
+  font-variation-settings: "wdth" 100;
+}
+
+.animate-banner-badge {
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-optical-sizing: auto;
+  font-variation-settings: "wdth" 100;
+  animation: bannerFadeInDown 1.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: 0.2s;
+}
+
+.animate-banner-title {
+  font-family: "Bricolage Grotesque", sans-serif !important;
+  font-optical-sizing: auto;
+  font-variation-settings: "wdth" 100;
+  animation: bannerFadeInUp 1.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: 0.4s;
+}
+
+.animate-banner-subtitle {
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-optical-sizing: auto;
+  font-variation-settings: "wdth" 100;
+  animation: bannerFadeInUp 1.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: 0.65s;
+}
+
+.animate-banner-btn {
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-optical-sizing: auto;
+  font-variation-settings: "wdth" 100;
+  animation: bannerFadeInUp 1.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: 0.88s;
 }

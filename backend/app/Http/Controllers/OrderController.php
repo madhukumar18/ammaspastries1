@@ -36,6 +36,10 @@ class OrderController extends Controller
             'items.*.variant_id' => 'nullable|exists:product_variants,id',
             'items.*.quantity' => 'required|integer|min:1|max:50',
             'items.*.customization' => 'nullable|array',
+        ], [
+            'items.*.product_id.exists' => 'One or more items in your cart are no longer available in our active catalog. Please refresh your cart or re-add the item.',
+            'items.*.product_id.required' => 'Product ID is missing for an item in your cart.',
+            'outlet_id.exists' => 'Selected bakery outlet is currently unavailable.',
         ]);
 
         return DB::transaction(function () use ($validated, $request) {
@@ -54,6 +58,9 @@ class OrderController extends Controller
                         ->firstOrFail();
                     $unitPrice = $variant->discount_price ?: $variant->price;
                     $variantTitle = $variant->size_weight;
+                } elseif (!empty($itemInput['customization']['unit_price']) && $product->id >= 9900) {
+                    $unitPrice = max(1, (float) $itemInput['customization']['unit_price']);
+                    $variantTitle = $itemInput['customization']['size'] ?? $itemInput['customization']['shape'] ?? null;
                 }
 
                 $qty = (int) $itemInput['quantity'];
@@ -91,9 +98,8 @@ class OrderController extends Controller
             $tax = round(($subtotal - $discount) * 0.05, 2); // 5% GST on bakery items
             $total = max(0, $subtotal - $discount + $deliveryFee + $tax);
 
-            // 4. Generate Order Number
-            $orderCountToday = Order::whereDate('created_at', today())->count() + 1;
-            $orderNumber = sprintf('AMP%s%04d', date('ymd'), $orderCountToday);
+            // 4. Generate Order Number starting from 62473
+            $orderNumber = Order::generateNextOrderNumber();
 
             // 5. Create Order
             $order = Order::create([
@@ -115,7 +121,7 @@ class OrderController extends Controller
                 'coupon_code' => $appliedCoupon?->code,
                 'payment_status' => 'pending',
                 'payment_method' => 'razorpay',
-                'order_status' => 'confirmed',
+                'order_status' => 'pending_payment',
                 'delivery_date' => $validated['delivery_date'],
                 'delivery_time_slot' => $validated['delivery_time_slot'],
                 'special_instructions' => $validated['special_instructions'] ?? null,

@@ -40,7 +40,7 @@ class AdminDashboardController extends Controller
 
         $counts = [
             'total_orders' => Order::count(),
-            'pending_orders' => Order::whereIn('order_status', ['confirmed', 'preparing'])->count(),
+            'pending_orders' => Order::whereIn('order_status', ['pending_payment', 'confirmed', 'preparing'])->count(),
             'completed_orders' => Order::where('order_status', 'delivered')->count(),
             'cancelled_orders' => Order::where('order_status', 'cancelled')->count(),
             'customers' => User::where('role', 'customer')->count(),

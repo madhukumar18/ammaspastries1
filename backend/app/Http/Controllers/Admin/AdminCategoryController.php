@@ -92,6 +92,30 @@ class AdminCategoryController extends Controller
         ], 201);
     }
 
+    public function updateSubcategory(Request $request, $id)
+    {
+        $subcategory = Subcategory::findOrFail($id);
+
+        $validated = $request->validate([
+            'name' => 'sometimes|required|string|max:255',
+            'category_id' => 'sometimes|required|exists:categories,id',
+            'description' => 'nullable|string',
+            'display_order' => 'integer',
+        ]);
+
+        if (isset($validated['name'])) {
+            $validated['slug'] = Str::slug($validated['name']);
+        }
+
+        $subcategory->update($validated);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Subcategory updated successfully!',
+            'data' => $subcategory,
+        ]);
+    }
+
     public function destroySubcategory($id)
     {
         $subcategory = Subcategory::findOrFail($id);

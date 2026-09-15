@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
+import brandLogo from '../../assets/logo.png';
 import {
   LayoutDashboard,
   Cake,
+  Camera,
   FolderTree,
   Store,
   ShoppingBag,
@@ -19,7 +21,9 @@ import {
   Menu,
   X,
   Sparkles,
-  ChevronRight
+  Images,
+  MonitorSmartphone,
+  ShieldAlert
 } from 'lucide-react';
 
 const AdminLayout = () => {
@@ -38,13 +42,18 @@ const AdminLayout = () => {
   const navItems = [
     { label: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
     { label: 'Products', path: '/admin/products', icon: Cake },
+    { label: 'Bulk Products (CSV/Excel)', path: '/admin/bulk-products', icon: FileSpreadsheet },
+    { label: 'Photo Cake Studio', path: '/admin/photo-cakes', icon: Camera },
     { label: 'Categories', path: '/admin/categories', icon: FolderTree },
+    { label: 'Category Images', path: '/admin/category-images', icon: Images },
     { label: 'Outlets', path: '/admin/outlets', icon: Store },
     { label: 'Orders & Tracking', path: '/admin/orders', icon: ShoppingBag },
+    { label: 'Rista POS Integration', path: '/admin/rista-pos', icon: MonitorSmartphone },
+    { label: 'Security & Threat Logs', path: '/admin/security-logs', icon: ShieldAlert },
     { label: 'Banners', path: '/admin/banners', icon: Image },
     { label: 'Gifting & Dream Cakes', path: '/admin/gifting', icon: Gift },
     { label: 'Customer Reviews', path: '/admin/reviews', icon: Star },
-    { label: 'Bulk Imports & Orders', path: '/admin/bulk-imports', icon: FileSpreadsheet },
+    { label: 'Corporate B2B Orders', path: '/admin/bulk-imports', icon: Handshake },
     { label: 'Franchise Enquiries', path: '/admin/franchise-enquiries', icon: Handshake },
     { label: 'Contact Enquiries', path: '/admin/contact-enquiries', icon: MessageSquare },
     { label: 'Content & Settings', path: '/admin/settings', icon: Settings },
@@ -54,7 +63,7 @@ const AdminLayout = () => {
     <div className="min-h-screen bg-slate-50 flex flex-col">
       
       {/* Admin Top Header */}
-      <header className="sticky top-0 z-40 bg-chocolate text-cream-light border-b border-amber-900/50 px-4 sm:px-6 py-3 flex items-center justify-between">
+      <header className="sticky top-0 z-40 bg-chocolate text-cream-light border-b border-amber-900/50 px-4 sm:px-6 py-2.5 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
@@ -63,12 +72,14 @@ const AdminLayout = () => {
             <Menu className="w-5 h-5" />
           </button>
           
-          <Link to="/admin/dashboard" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-amber-500 text-chocolate flex items-center justify-center font-serif font-bold text-sm">
-              A
-            </div>
-            <span className="font-serif font-bold text-base tracking-wide text-white">
-              AMMAS ADMIN PANEL
+          <Link to="/admin/dashboard" className="flex items-center gap-2.5 group">
+            <img
+              src={brandLogo}
+              alt="Ammas Pastries"
+              className="h-8 sm:h-9 w-auto object-contain bg-white px-2 py-0.5 rounded-lg shadow-xs transition-transform duration-200 group-hover:scale-105"
+            />
+            <span className="font-serif font-bold text-xs sm:text-sm tracking-wider uppercase text-amber-200 border-l border-amber-800/80 pl-2.5 hidden sm:inline">
+              Admin Panel
             </span>
           </Link>
         </div>
@@ -139,8 +150,8 @@ const AdminLayout = () => {
             />
             <div className="relative w-64 bg-white h-full shadow-2xl p-4 overflow-y-auto z-10 space-y-2 animate-in slide-in-from-left duration-200">
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                <span className="font-serif font-bold text-chocolate text-sm">Ammas Admin Menu</span>
-                <button onClick={() => setMobileSidebarOpen(false)} className="text-slate-400 p-1">
+                <img src={brandLogo} alt="Ammas Pastries" className="h-7 w-auto object-contain" />
+                <button onClick={() => setMobileSidebarOpen(false)} className="text-slate-400 hover:text-slate-600 p-1">
                   ✕
                 </button>
               </div>

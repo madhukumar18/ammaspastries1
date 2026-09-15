@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="none">
+  <g filter="drop-shadow(0px 2px 3px rgba(36,20,10,0.35))">
+    <!-- Star Sparkle 1 (Top Left Hotspot) -->
+    <path d="M4 1L5.2 4.2L8.4 5.4L5.2 6.6L4 9.8L2.8 6.6L-0.4 5.4L2.8 4.2L4 1Z" fill="#FBBF24" stroke="#FFFFFF" stroke-width="0.8"/>
+
+    <!-- Cupcake Liner / Wrapper -->
+    <path d="M9 19L11 29C11.2 29.8 11.8 30.5 12.6 30.5H21.4C22.2 30.5 22.8 29.8 23 29L25 19H9Z" 
+          fill="#E11D48" 
+          stroke="#FFFFFF" 
+          stroke-width="1.2" 
+          stroke-linejoin="round"/>
+    <!-- Liner Pleats -->
+    <path d="M12.5 19.5L14 29.5M17 19.5L17 29.5M21.5 19.5L20 29.5" stroke="#9F1239" stroke-width="0.9" stroke-linecap="round"/>
+
+    <!-- Swirled Strawberry & Vanilla Frosting -->
+    <path d="M8 19C7 17.5 7.8 15.5 9.5 15C10.5 13 12.5 12 15 12.2C16.2 10.5 18.5 10 20.5 11C22.5 10.5 24.5 11.8 25 13.8C26.5 14.5 27 16.5 26 18.5C25.5 19.5 24.5 19.8 23.5 20H10.5C9.5 19.8 8.5 19.5 8 19Z" 
+          fill="#FB7185" 
+          stroke="#FFFFFF" 
+          stroke-width="1.2" 
+          stroke-linejoin="round"/>
+    
+    <!-- Top Frosting Swirl Highlight (Cream) -->
+    <path d="M12 15.5C13.5 14 16.5 14 18 15.5C19.5 14 21.5 14.5 22.5 16" stroke="#FFFDF9" stroke-width="1.5" stroke-linecap="round"/>
+
+    <!-- Sprinkles -->
+    <rect x="11.5" y="16.5" width="2" height="0.8" rx="0.4" transform="rotate(30 11.5 16.5)" fill="#60A5FA"/>
+    <rect x="21" y="16" width="2" height="0.8" rx="0.4" transform="rotate(-25 21 16)" fill="#FDE047"/>
+    <rect x="16.5" y="17" width="2" height="0.8" rx="0.4" transform="rotate(45 16.5 17)" fill="#34D399"/>
+    <rect x="15" y="14" width="2" height="0.8" rx="0.4" transform="rotate(-15 15 14)" fill="#A78BFA"/>
+
+    <!-- Glossy Red Cherry on Top -->
+    <circle cx="17" cy="8.5" r="3.2" fill="#E11D48" stroke="#FFFFFF" stroke-width="1"/>
+    <circle cx="15.8" cy="7.3" r="1" fill="#FFFFFF"/>
+    <!-- Cherry Stem -->
+    <path d="M17.5 5.5C18.5 3 21 2 23 2.5" stroke="#4B5563" stroke-width="1.2" stroke-linecap="round"/>
+
+    <!-- Golden Sparkle on Hover -->
+    <path d="M27 6L27.9 8.2L30.1 9.1L27.9 10L27 12.2L26.1 10L23.9 9.1L26.1 8.2L27 6Z" fill="#FBBF24" stroke="#FFFFFF" stroke-width="0.5"/>
+  </g>
+</svg>

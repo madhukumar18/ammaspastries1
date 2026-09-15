@@ -1,9 +1,10 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
-import { Heart, Star, ShoppingBag, Sparkles } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Heart, Star, ShoppingBag, Zap } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
-const ProductCard = ({ product }) => {
+const ProductCard = ({ product, onAddToCart, onOrderNow }) => {
+  const navigate = useNavigate();
   const { addToCart, toggleWishlist, isInWishlist } = useApp();
 
   const isFavorited = isInWishlist(product.id);
@@ -16,7 +17,22 @@ const ProductCard = ({ product }) => {
   const handleAddToCart = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    addToCart(product, defaultVariant, 1);
+    if (onAddToCart) {
+      onAddToCart(product, defaultVariant, 1);
+    } else {
+      addToCart(product, defaultVariant, 1);
+    }
+  };
+
+  const handleOrderNow = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (onOrderNow) {
+      onOrderNow(product, defaultVariant, 1);
+    } else {
+      addToCart(product, defaultVariant, 1);
+      navigate('/checkout');
+    }
   };
 
   const handleWishlistToggle = (e) => {
@@ -51,11 +67,18 @@ const ProductCard = ({ product }) => {
               BESTSELLER
             </span>
           )}
-          {product.is_eggless && (
-            <span className="bg-emerald-600/90 backdrop-blur-xs text-white text-[9px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-xs">
-              <span className="w-1.5 h-1.5 rounded-full bg-white"></span>
-              100% Eggless
-            </span>
+          {!['party-items', 'dry-fruits'].includes(product.category?.slug) && (
+            product.is_eggless ? (
+              <span className="bg-emerald-600/90 backdrop-blur-xs text-white text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-xs">
+                <span className="w-1.5 h-1.5 rounded-full bg-white"></span>
+                <span>100% Eggless</span>
+              </span>
+            ) : (
+              <span className="bg-amber-800/90 backdrop-blur-xs text-white text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-xs">
+                <span>🥚</span>
+                <span>With Egg</span>
+              </span>
+            )
           )}
         </div>
 
@@ -106,8 +129,8 @@ const ProductCard = ({ product }) => {
           </p>
         </div>
 
-        {/* Bottom: Price & Add to Cart */}
-        <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+        {/* Bottom: Price & Weight Info */}
+        <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
           <div>
             <div className="flex items-baseline gap-1.5">
               <span className="text-base sm:text-lg font-bold text-chocolate">
@@ -119,15 +142,39 @@ const ProductCard = ({ product }) => {
                 </span>
               )}
             </div>
-            <span className="text-[10px] text-emerald-600 font-medium">In Stock</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-emerald-600 font-medium">In Stock</span>
+              {product.weight ? (
+                <span className="text-[10px] text-slate-400 font-medium">• Min {product.weight}</span>
+              ) : defaultVariant?.size_weight ? (
+                <span className="text-[10px] text-slate-400 font-medium">• Min {defaultVariant.size_weight}</span>
+              ) : (
+                <span className="text-[10px] text-slate-400 font-medium">• Min 0.5kg</span>
+              )}
+            </div>
           </div>
+        </div>
+
+        {/* Dual Action Buttons: Add to Cart + Order Now */}
+        <div className="mt-2.5 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={handleAddToCart}
+            className="flex items-center justify-center gap-1 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300/90 font-bold text-[11px] py-2 px-1.5 rounded-xl transition-all active:scale-95 shadow-2xs cursor-pointer"
+            title="Add item to cart"
+          >
+            <ShoppingBag className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+            <span>Add to Cart</span>
+          </button>
 
           <button
-            onClick={handleAddToCart}
-            className="flex items-center gap-1.5 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-700 hover:to-amber-600 text-white font-semibold text-xs py-2 px-3.5 rounded-xl shadow-xs hover:shadow-md transition-all active:scale-95"
+            type="button"
+            onClick={handleOrderNow}
+            className="flex items-center justify-center gap-1 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-700 hover:to-amber-600 text-white font-bold text-[11px] py-2 px-1.5 rounded-xl shadow-xs hover:shadow-md transition-all active:scale-95 cursor-pointer"
+            title="Order directly"
           >
-            <ShoppingBag className="w-3.5 h-3.5" />
-            <span>Add</span>
+            <Zap className="w-3.5 h-3.5 fill-amber-200 text-amber-200 shrink-0" />
+            <span>Order Now</span>
           </button>
         </div>
       </div>

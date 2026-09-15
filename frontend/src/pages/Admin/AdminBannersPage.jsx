@@ -115,8 +115,8 @@ const AdminBannersPage = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 15 * 1024 * 1024) {
-      showToast('Image file size must be less than 15MB', 'error');
+    if (file.size > 30 * 1024 * 1024) {
+      showToast('Image file size must be less than 30MB', 'error');
       return;
     }
 
@@ -149,8 +149,8 @@ const AdminBannersPage = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 15 * 1024 * 1024) {
-      showToast('Image file size must be less than 15MB', 'error');
+    if (file.size > 30 * 1024 * 1024) {
+      showToast('Image file size must be less than 30MB', 'error');
       return;
     }
 
@@ -267,8 +267,8 @@ const AdminBannersPage = () => {
                     <span className="text-xs uppercase tracking-wider text-cream-200 font-semibold mb-1">
                       Display Order: #{banner.display_order}
                     </span>
-                    <h3 className="font-serif font-bold text-xl leading-tight mb-1">{banner.title}</h3>
-                    {banner.subtitle && <p className="text-xs text-cream-200 line-clamp-2">{banner.subtitle}</p>}
+                    <h3 className="font-banner font-bold text-xl leading-tight mb-1">{banner.title}</h3>
+                    {banner.subtitle && <p className="text-xs text-cream-200 line-clamp-2 font-banner">{banner.subtitle}</p>}
                   </div>
 
                   <div className="absolute top-3 right-3 flex items-center gap-2">
@@ -307,7 +307,7 @@ const AdminBannersPage = () => {
                       <Smartphone className="w-3.5 h-3.5 text-emerald-600" />
                       <span>
                         Mobile View: {banner.mobile_image_url ? (
-                          <strong className="text-emerald-700">Custom 800×800 px</strong>
+                          <strong className="text-emerald-700">Custom 1080×750 px</strong>
                         ) : (
                           <span className="text-slate-400">Uses Desktop Image</span>
                         )}
@@ -410,7 +410,7 @@ const AdminBannersPage = () => {
                       <span>Desktop View Banner Image *</span>
                     </span>
                     <span className="text-[11px] text-blue-800 font-semibold bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200 inline-block mt-0.5">
-                      Recommended Resolution: 1920 × 600 px (or 1600 × 550 px)
+                      Recommended Resolution: 1920 × 500 px (or 1600 × 500 px, Max 30MB)
                     </span>
                   </div>
 
@@ -457,7 +457,7 @@ const AdminBannersPage = () => {
                       ) : (
                         <div className="flex items-center justify-center gap-2 py-1">
                           <Upload className="w-4 h-4 text-blue-600" />
-                          <span className="font-bold text-slate-700">Choose desktop image from local gallery (1920×600 px)</span>
+                          <span className="font-bold text-slate-700">Choose desktop image from local gallery (1920×500 px, max 30MB)</span>
                         </div>
                       )}
                     </div>
@@ -473,16 +473,16 @@ const AdminBannersPage = () => {
                     required
                     value={formData.image_url}
                     onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
-                    placeholder="https://images.unsplash.com/... (1920x600 px)"
+                    placeholder="https://images.unsplash.com/... (1920x500 px)"
                     className="w-full p-2 rounded-xl border border-slate-200 bg-white font-mono text-[11px]"
                   />
                 )}
 
                 {formData.image_url && (
-                  <div className="h-20 rounded-xl overflow-hidden border border-slate-200 relative">
+                  <div className="h-28 sm:h-36 rounded-xl overflow-hidden border border-slate-200 relative">
                     <img src={formData.image_url} alt="Desktop Preview" className="w-full h-full object-cover" />
                     <span className="absolute bottom-1 right-2 bg-black/70 text-white text-[9px] px-1.5 py-0.5 rounded">
-                      Desktop Aspect (16:5)
+                      Desktop Aspect (1920×500 px)
                     </span>
                   </div>
                 )}
@@ -497,7 +497,7 @@ const AdminBannersPage = () => {
                       <span>Mobile View Banner Image (Smartphone Optimized)</span>
                     </span>
                     <span className="text-[11px] text-amber-800 font-semibold bg-amber-100 px-2 py-0.5 rounded-md border border-amber-300 inline-block mt-0.5">
-                      Recommended Resolution: 800 × 800 px or 750 × 600 px (Portrait / Square)
+                      Recommended Resolution: 1080 × 750 px or 800 × 600 px (Max 30MB)
                     </span>
                   </div>
 
@@ -544,7 +544,7 @@ const AdminBannersPage = () => {
                       ) : (
                         <div className="flex items-center justify-center gap-2 py-1">
                           <Upload className="w-4 h-4 text-amber-600" />
-                          <span className="font-bold text-slate-700">Choose mobile phone image from gallery (800×800 px)</span>
+                          <span className="font-bold text-slate-700">Choose mobile phone image from gallery (1080×750 px, max 30MB)</span>
                         </div>
                       )}
                     </div>
@@ -559,16 +559,16 @@ const AdminBannersPage = () => {
                     type="url"
                     value={formData.mobile_image_url}
                     onChange={(e) => setFormData({ ...formData, mobile_image_url: e.target.value })}
-                    placeholder="https://images.unsplash.com/... (800x800 px for mobile screens)"
+                    placeholder="https://images.unsplash.com/... (1080x750 px for mobile screens)"
                     className="w-full p-2 rounded-xl border border-slate-200 bg-white font-mono text-[11px]"
                   />
                 )}
 
                 {formData.mobile_image_url && (
-                  <div className="w-32 h-32 rounded-xl overflow-hidden border border-amber-300 mx-auto relative shadow-xs">
+                  <div className="w-40 h-28 rounded-xl overflow-hidden border border-amber-300 mx-auto relative shadow-xs">
                     <img src={formData.mobile_image_url} alt="Mobile Preview" className="w-full h-full object-cover" />
                     <span className="absolute bottom-1 right-1 bg-black/70 text-white text-[8px] px-1 rounded">
-                      Mobile (1:1)
+                      Mobile (1080×750 px)
                     </span>
                   </div>
                 )}

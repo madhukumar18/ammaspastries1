@@ -34,15 +34,17 @@ export default {
           DEFAULT: '#D97706',
           dark: '#B45309',
         },
-        berry: {
-          light: '#FB7185',
-          DEFAULT: '#E11D48',
-          dark: '#9F1239',
-        }
+        brand: {
+          orange: '#ff6600',
+          DEFAULT: '#ff6600',
+          hover: '#e65c00',
+        },
       },
       fontFamily: {
         serif: ['"Playfair Display"', 'Georgia', 'serif'],
         sans: ['"Inter"', 'system-ui', 'sans-serif'],
+        banner: ['"Bricolage Grotesque"', 'sans-serif'],
+        bricolage: ['"Bricolage Grotesque"', 'sans-serif'],
       },
       boxShadow: {
         'warm': '0 10px 25px -5px rgba(61, 35, 20, 0.08), 0 8px 10px -6px rgba(61, 35, 20, 0.04)',
