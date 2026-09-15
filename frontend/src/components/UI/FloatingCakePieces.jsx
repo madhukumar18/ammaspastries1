@@ -94,42 +94,42 @@ const CakePieceSVG = ({ type = 'strawberry', className = "w-full h-full" }) => {
 // 16 Ambient Cake Pieces gracefully distributed across the entire homepage height
 const HOMEPAGE_CAKE_PIECES = [
   // Top Hero & Categories Section (0% - 20%)
-  { id: 1, type: 'strawberry', top: '3%', left: '2%', size: 'w-9 h-9 sm:w-11 sm:h-11', anim: 'animate-[floatCakeSlow_5s_ease-in-out_infinite]', delay: '0s', rot: '-12deg' },
-  { id: 2, type: 'chocolate', top: '7%', right: '3%', size: 'w-8 h-8 sm:w-10 sm:h-10', anim: 'animate-[floatCakeFast_4.2s_ease-in-out_infinite]', delay: '0.6s', rot: '15deg' },
-  { id: 3, type: 'cupcake', top: '14%', left: '4%', size: 'w-9 h-9 sm:w-12 sm:h-12', anim: 'animate-[floatCakeMedium_4.8s_ease-in-out_infinite]', delay: '1.2s', rot: '8deg' },
-  { id: 4, type: 'redvelvet', top: '18%', right: '2%', size: 'w-8 h-8 sm:w-11 sm:h-11', anim: 'animate-[floatCakeSlow_5.4s_ease-in-out_infinite]', delay: '1.8s', rot: '-10deg' },
+  { id: 1, type: 'strawberry', top: '3%', left: '2%', size: 'w-9 h-9 sm:w-11 sm:h-11', anim: 'animate-float-cake-slow', delay: '0s', rot: '-12deg' },
+  { id: 2, type: 'chocolate', top: '7%', right: '3%', size: 'w-8 h-8 sm:w-10 sm:h-10', anim: 'animate-float-cake-fast', delay: '0.6s', rot: '15deg' },
+  { id: 3, type: 'cupcake', top: '14%', left: '3%', size: 'w-9 h-9 sm:w-12 sm:h-12', anim: 'animate-float-cake-medium', delay: '1.2s', rot: '8deg' },
+  { id: 4, type: 'redvelvet', top: '19%', right: '2%', size: 'w-8 h-8 sm:w-11 sm:h-11', anim: 'animate-float-cake-slow', delay: '1.8s', rot: '-10deg' },
 
   // Gifting & Bestsellers Section (20% - 40%)
-  { id: 5, type: 'cheesecake', top: '26%', left: '3%', size: 'w-8 h-8 sm:w-10 sm:h-10', anim: 'animate-[floatCakeFast_4.5s_ease-in-out_infinite]', delay: '0.4s', rot: '14deg' },
-  { id: 6, type: 'strawberry', top: '31%', right: '3%', size: 'w-9 h-9 sm:w-12 sm:h-12', anim: 'animate-[floatCakeMedium_5.1s_ease-in-out_infinite]', delay: '1.5s', rot: '-8deg' },
-  { id: 7, type: 'chocolate', top: '38%', left: '2%', size: 'w-8 h-8 sm:w-10 sm:h-10', anim: 'animate-[floatCakeSlow_4.9s_ease-in-out_infinite]', delay: '2.2s', rot: '12deg' },
+  { id: 5, type: 'cheesecake', top: '26%', left: '2.5%', size: 'w-8 h-8 sm:w-10 sm:h-10', anim: 'animate-float-cake-fast', delay: '0.4s', rot: '14deg' },
+  { id: 6, type: 'strawberry', top: '32%', right: '2.5%', size: 'w-9 h-9 sm:w-12 sm:h-12', anim: 'animate-float-cake-medium', delay: '1.5s', rot: '-8deg' },
+  { id: 7, type: 'chocolate', top: '38%', left: '2%', size: 'w-8 h-8 sm:w-10 sm:h-10', anim: 'animate-float-cake-slow', delay: '2.2s', rot: '12deg' },
 
   // Dream Cake & Signature Section (40% - 60%)
-  { id: 8, type: 'cupcake', top: '46%', right: '4%', size: 'w-9 h-9 sm:w-11 sm:h-11', anim: 'animate-[floatCakeFast_4.3s_ease-in-out_infinite]', delay: '0.9s', rot: '-15deg' },
-  { id: 9, type: 'redvelvet', top: '52%', left: '3%', size: 'w-8 h-8 sm:w-10 sm:h-10', anim: 'animate-[floatCakeSlow_5.2s_ease-in-out_infinite]', delay: '1.6s', rot: '6deg' },
-  { id: 10, type: 'cheesecake', top: '58%', right: '2%', size: 'w-9 h-9 sm:w-11 sm:h-11', anim: 'animate-[floatCakeMedium_4.7s_ease-in-out_infinite]', delay: '2.5s', rot: '-12deg' },
+  { id: 8, type: 'cupcake', top: '46%', right: '3.5%', size: 'w-9 h-9 sm:w-11 sm:h-11', anim: 'animate-float-cake-fast', delay: '0.9s', rot: '-15deg' },
+  { id: 9, type: 'redvelvet', top: '52%', left: '2.5%', size: 'w-8 h-8 sm:w-10 sm:h-10', anim: 'animate-float-cake-slow', delay: '1.6s', rot: '6deg' },
+  { id: 10, type: 'cheesecake', top: '58%', right: '2%', size: 'w-9 h-9 sm:w-11 sm:h-11', anim: 'animate-float-cake-medium', delay: '2.5s', rot: '-12deg' },
 
   // Photo Cake & Features Section (60% - 80%)
-  { id: 11, type: 'strawberry', top: '65%', left: '2%', size: 'w-9 h-9 sm:w-12 sm:h-12', anim: 'animate-[floatCakeSlow_4.8s_ease-in-out_infinite]', delay: '0.3s', rot: '10deg' },
-  { id: 12, type: 'chocolate', top: '72%', right: '3%', size: 'w-8 h-8 sm:w-10 sm:h-10', anim: 'animate-[floatCakeFast_4.4s_ease-in-out_infinite]', delay: '1.1s', rot: '-9deg' },
-  { id: 13, type: 'cupcake', top: '78%', left: '3%', size: 'w-9 h-9 sm:w-11 sm:h-11', anim: 'animate-[floatCakeMedium_5.3s_ease-in-out_infinite]', delay: '1.9s', rot: '14deg' },
+  { id: 11, type: 'strawberry', top: '65%', left: '2%', size: 'w-9 h-9 sm:w-12 sm:h-12', anim: 'animate-float-cake-slow', delay: '0.3s', rot: '10deg' },
+  { id: 12, type: 'chocolate', top: '72%', right: '3%', size: 'w-8 h-8 sm:w-10 sm:h-10', anim: 'animate-float-cake-fast', delay: '1.1s', rot: '-9deg' },
+  { id: 13, type: 'cupcake', top: '78%', left: '2.5%', size: 'w-9 h-9 sm:w-11 sm:h-11', anim: 'animate-float-cake-medium', delay: '1.9s', rot: '14deg' },
 
   // Reviews & Bottom Section (80% - 98%)
-  { id: 14, type: 'redvelvet', top: '85%', right: '2%', size: 'w-8 h-8 sm:w-11 sm:h-11', anim: 'animate-[floatCakeSlow_5s_ease-in-out_infinite]', delay: '0.7s', rot: '-14deg' },
-  { id: 15, type: 'cheesecake', top: '91%', left: '2%', size: 'w-8 h-8 sm:w-10 sm:h-10', anim: 'animate-[floatCakeFast_4.6s_ease-in-out_infinite]', delay: '1.4s', rot: '8deg' },
-  { id: 16, type: 'strawberry', top: '96%', right: '3%', size: 'w-9 h-9 sm:w-12 sm:h-12', anim: 'animate-[floatCakeMedium_4.9s_ease-in-out_infinite]', delay: '2.1s', rot: '-10deg' },
+  { id: 14, type: 'redvelvet', top: '85%', right: '2%', size: 'w-8 h-8 sm:w-11 sm:h-11', anim: 'animate-float-cake-slow', delay: '0.7s', rot: '-14deg' },
+  { id: 15, type: 'cheesecake', top: '91%', left: '2%', size: 'w-8 h-8 sm:w-10 sm:h-10', anim: 'animate-float-cake-fast', delay: '1.4s', rot: '8deg' },
+  { id: 16, type: 'strawberry', top: '96%', right: '2.5%', size: 'w-9 h-9 sm:w-12 sm:h-12', anim: 'animate-float-cake-medium', delay: '2.1s', rot: '-10deg' },
 ];
 
 export const FloatingCakePieces = () => {
   return (
     <div 
       aria-hidden="true" 
-      className="pointer-events-none absolute inset-0 w-full h-full overflow-hidden z-10 select-none"
+      className="pointer-events-none absolute inset-0 w-full h-full overflow-hidden z-20 select-none"
     >
       {HOMEPAGE_CAKE_PIECES.map((piece) => (
         <div
           key={piece.id}
-          className="absolute transition-opacity duration-300 opacity-80 hover:opacity-100"
+          className="absolute transition-opacity duration-300 opacity-85 hover:opacity-100"
           style={{
             top: piece.top,
             left: piece.left,
@@ -138,11 +138,11 @@ export const FloatingCakePieces = () => {
           }}
         >
           <div
-            className={`${piece.size} ${piece.anim} drop-shadow-sm`}
+            className={`${piece.size} ${piece.anim} drop-shadow-md`}
             style={{ transform: `rotate(${piece.rot})` }}
           >
             {/* Soft Ambient Bakery Glow */}
-            <div className="absolute inset-0 rounded-full bg-amber-400/15 blur-sm" />
+            <div className="absolute inset-0 rounded-full bg-amber-400/20 blur-sm" />
             
             {/* Pure SVG Cake Piece without text or labels */}
             <CakePieceSVG type={piece.type} />
