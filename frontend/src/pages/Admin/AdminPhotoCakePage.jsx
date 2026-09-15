@@ -735,14 +735,65 @@ const AdminPhotoCakePage = () => {
                   </div>
 
                   <div className="flex items-center gap-3">
-                    {/* Dietary Badges */}
-                    <div className="flex items-center gap-1.5 text-[10px] font-bold">
-                      {flavour.is_eggless_available && (
-                        <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">Eggless</span>
-                      )}
-                      {flavour.is_egg_available && (
-                        <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">With Egg</span>
-                      )}
+                    {/* Interactive Dietary Recipe Toggles (Eggless / With Egg) */}
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleFlavourFieldChange(
+                            fIdx,
+                            'is_eggless_available',
+                            !flavour.is_eggless_available
+                          )
+                        }
+                        className={`px-3 py-1 rounded-full flex items-center gap-1.5 transition-all cursor-pointer border text-xs font-bold ${
+                          flavour.is_eggless_available
+                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                            : 'bg-slate-100 text-slate-400 border-slate-200 hover:bg-slate-200 line-through'
+                        }`}
+                        title="Click to toggle 100% Eggless option for this flavour"
+                      >
+                        <span
+                          className={`w-2 h-2 rounded-full ${
+                            flavour.is_eggless_available ? 'bg-white' : 'bg-slate-400'
+                          }`}
+                        />
+                        <span>Eggless</span>
+                        {flavour.is_eggless_available ? (
+                          <Check className="w-3.5 h-3.5" />
+                        ) : (
+                          <span className="text-[10px] font-normal no-underline">(Disabled)</span>
+                        )}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleFlavourFieldChange(
+                            fIdx,
+                            'is_egg_available',
+                            !flavour.is_egg_available
+                          )
+                        }
+                        className={`px-3 py-1 rounded-full flex items-center gap-1.5 transition-all cursor-pointer border text-xs font-bold ${
+                          flavour.is_egg_available
+                            ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
+                            : 'bg-slate-100 text-slate-400 border-slate-200 hover:bg-slate-200 line-through'
+                        }`}
+                        title="Click to toggle With Egg option for this flavour"
+                      >
+                        <span
+                          className={`w-2 h-2 rounded-full ${
+                            flavour.is_egg_available ? 'bg-white' : 'bg-slate-400'
+                          }`}
+                        />
+                        <span>With Egg</span>
+                        {flavour.is_egg_available ? (
+                          <Check className="w-3.5 h-3.5" />
+                        ) : (
+                          <span className="text-[10px] font-normal no-underline">(Disabled)</span>
+                        )}
+                      </button>
                     </div>
 
                     <button
@@ -797,6 +848,40 @@ const AdminPhotoCakePage = () => {
                       placeholder="e.g. Rich Belgian dark chocolate ganache"
                       className="w-full text-xs p-2.5 rounded-xl border border-slate-200 text-slate-700 focus:outline-none focus:border-amber-500 bg-white"
                     />
+                  </div>
+                </div>
+
+                {/* Flavour Dietary Controls: Egg or Eggless options for this flavour */}
+                <div className="p-3.5 bg-gradient-to-r from-emerald-50/60 via-amber-50/40 to-emerald-50/60 rounded-2xl border border-emerald-200/70 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="text-xs font-bold text-chocolate flex items-center gap-2">
+                      <span>Recipe & Dietary Availability:</span>
+                      <span className="text-[10px] font-normal text-slate-500">
+                        (Choose whether customers can order this flavour in Eggless, With Egg, or both)
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <label className="flex items-center gap-2 text-xs font-bold text-emerald-900 bg-white px-3.5 py-2 rounded-xl border border-emerald-300 shadow-xs cursor-pointer hover:bg-emerald-50/60 transition-all select-none">
+                      <input
+                        type="checkbox"
+                        checked={flavour.is_eggless_available !== false}
+                        onChange={(e) => handleFlavourFieldChange(fIdx, 'is_eggless_available', e.target.checked)}
+                        className="w-4 h-4 accent-emerald-600 cursor-pointer"
+                      />
+                      <span>100% Pure Eggless Recipe</span>
+                    </label>
+
+                    <label className="flex items-center gap-2 text-xs font-bold text-amber-900 bg-white px-3.5 py-2 rounded-xl border border-amber-300 shadow-xs cursor-pointer hover:bg-amber-50/60 transition-all select-none">
+                      <input
+                        type="checkbox"
+                        checked={flavour.is_egg_available !== false}
+                        onChange={(e) => handleFlavourFieldChange(fIdx, 'is_egg_available', e.target.checked)}
+                        className="w-4 h-4 accent-amber-600 cursor-pointer"
+                      />
+                      <span>Baked With Egg (Classic Recipe)</span>
+                    </label>
                   </div>
                 </div>
 
