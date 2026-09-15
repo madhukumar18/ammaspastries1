@@ -355,6 +355,9 @@ const HomePage = () => {
       {/* 4. DREAM CAKE / TAILORED FOR YOUR OCCASIONS */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="relative rounded-3xl overflow-hidden bg-gradient-to-r from-chocolate via-chocolate-light to-amber-950 text-white shadow-warm-lg p-8 sm:p-12 md:p-16 border-2 border-amber-600/40">
+          {/* Animated Floating Cake Pieces */}
+          <FloatingCakePieces inHero={false} />
+
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
             
             <div className="lg:col-span-7 space-y-4">
