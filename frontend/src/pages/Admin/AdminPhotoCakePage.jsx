@@ -211,6 +211,17 @@ const AdminPhotoCakePage = () => {
   // Flavour field update helper
   const handleFlavourFieldChange = (flavourIndex, field, value) => {
     const updated = [...flavours];
+
+    // Ensure at least one recipe option (Eggless or With Egg) remains active
+    if (field === 'is_eggless_available' && value === false && !updated[flavourIndex].is_egg_available) {
+      showToast('A flavour must have at least one recipe option (Eggless or With Egg) enabled.', 'error');
+      return;
+    }
+    if (field === 'is_egg_available' && value === false && !updated[flavourIndex].is_eggless_available) {
+      showToast('A flavour must have at least one recipe option (Eggless or With Egg) enabled.', 'error');
+      return;
+    }
+
     updated[flavourIndex][field] = value;
     setFlavours(updated);
   };
