@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import api from '../../services/api';
 import ProductCard from '../../components/UI/ProductCard';
 import CategoryImagesCarousel from '../../components/UI/CategoryImagesCarousel';
+import FloatingCakePieces from '../../components/UI/FloatingCakePieces';
 import { ProductCardSkeleton, BannerSkeleton } from '../../components/UI/SkeletonLoader';
 import {
   ChevronLeft,
