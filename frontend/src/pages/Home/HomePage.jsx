@@ -180,6 +180,9 @@ const HomePage = () => {
           <BannerSkeleton />
         ) : banners.length > 0 ? (
           <div className="relative w-full h-[380px] sm:h-[440px] md:h-[480px] lg:h-[510px] rounded-2xl sm:rounded-3xl overflow-hidden shadow-warm-lg bg-chocolate">
+            {/* Animated Floating Cake Pieces */}
+            <FloatingCakePieces inHero={true} />
+
             {banners.map((banner, idx) => (
               <div
                 key={banner.id || idx}
