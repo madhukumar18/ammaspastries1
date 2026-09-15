@@ -205,14 +205,18 @@ const PhotoCakePage = () => {
             });
 
             setFlavours(sortedFlavours);
-            setSelectedFlavour(sortedFlavours[0]);
-            if (sortedFlavours[0].weights && sortedFlavours[0].weights.length > 0) {
-              setCakeSize(sortedFlavours[0].weights[0].weight);
+            const firstFlv = sortedFlavours[0];
+            setSelectedFlavour(firstFlv);
+            if (firstFlv.weights && firstFlv.weights.length > 0) {
+              setCakeSize(firstFlv.weights[0].weight);
             }
-          }
-          if (cfg.dietary) {
-            setDietaryConfig(cfg.dietary);
-            setIsEggless(cfg.dietary.default_dietary !== 'egg');
+            if (firstFlv.is_eggless_available !== false && firstFlv.is_egg_available === false) {
+              setIsEggless(true);
+            } else if (firstFlv.is_eggless_available === false && firstFlv.is_egg_available !== false) {
+              setIsEggless(false);
+            } else if (cfg.dietary) {
+              setIsEggless(cfg.dietary.default_dietary !== 'egg');
+            }
           }
         }
       } catch (err) {
@@ -227,6 +231,13 @@ const PhotoCakePage = () => {
   const handleFlavourChange = (flavourName) => {
     const found = flavours.find((f) => f.name === flavourName) || flavours[0];
     setSelectedFlavour(found);
+
+    // Sync dietary preference if the flavour only supports one preparation
+    if (found.is_eggless_available !== false && found.is_egg_available === false) {
+      setIsEggless(true);
+    } else if (found.is_eggless_available === false && found.is_egg_available !== false) {
+      setIsEggless(false);
+    }
 
     const sortedWeights = (found.weights || [])
       .slice()
@@ -634,52 +645,166 @@ const PhotoCakePage = () => {
               onChange={(e) => handleFlavourChange(e.target.value)}
               className="w-full p-3 text-xs sm:text-sm rounded-xl border border-slate-200 font-medium text-chocolate focus:outline-none focus:border-amber-500 bg-white cursor-pointer"
             >
-              {flavours.map((flv) => (
-                <option key={flv.id || flv.name} value={flv.name}>
-                  {flv.name}
-                </option>
-              ))}
+              {flavours.map((flv) => {
+                const canEggless = flv.is_eggless_available !== false;
+                const canEgg = flv.is_egg_available !== false;
+                const recipeTag =
+                  canEggless && canEgg
+                    ? '(Eggless & With Egg)'
+                    : canEggless
+                    ? '(100% Eggless Only)'
+                    : '(With Egg Only)';
+                return (
+                  <option key={flv.id || flv.name} value={flv.name}>
+                    {flv.name} — {recipeTag}
+                  </option>
+                );
+              })}
             </select>
-            {selectedFlavour?.description && (
-              <p className="text-[11px] text-slate-500 italic mt-0.5">
-                {selectedFlavour.description}
-              </p>
-            )}
+
+            {/* Selected Flavour Dietary Badges & Description */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
+              {selectedFlavour?.description && (
+                <p className="text-[11px] text-slate-500 italic">
+                  {selectedFlavour.description}
+                </p>
+              )}
+              <div className="flex items-center gap-1.5 text-[10px] font-bold ml-auto">
+                {selectedFlavour?.is_eggless_available !== false && (
+                  <span className="bg-emerald-100 text-emerald-800 border border-emerald-300 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
+                    Eggless Recipe
+                  </span>
+                )}
+                {selectedFlavour?.is_egg_available !== false && (
+                  <span className="bg-amber-100 text-amber-800 border border-amber-300 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />
+                    With Egg Recipe
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
 
-          {/* Step 5: Eggless Toggle & Special Instructions */}
+          {/* Step 5: Eggless / With Egg Recipe Selection */}
           <div className="space-y-3">
-            {dietaryConfig.allow_eggless && dietaryConfig.allow_egg ? (
-              <div className="flex items-center justify-between p-3 bg-emerald-50 rounded-2xl border border-emerald-200">
-                <div className="flex items-center gap-2">
-                  <span className={`w-3 h-3 rounded-full ${isEggless ? 'bg-emerald-600' : 'bg-amber-700'} flex-shrink-0`} />
-                  <span className="text-xs font-bold text-emerald-950">
-                    {isEggless
-                      ? dietaryConfig.eggless_label || '100% Eggless Preparation'
-                      : dietaryConfig.egg_label || 'With Egg (Classic Bakery)'}
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+              5. Cake Preparation (Recipe Preference):
+            </label>
+
+            {(() => {
+              const canEggless = selectedFlavour ? selectedFlavour.is_eggless_available !== false : true;
+              const canEgg = selectedFlavour ? selectedFlavour.is_egg_available !== false : true;
+
+              if (canEggless && canEgg) {
+                return (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setIsEggless(true)}
+                      className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex items-center justify-between ${
+                        isEggless
+                          ? 'border-emerald-600 bg-emerald-50/90 ring-2 ring-emerald-500/30 shadow-xs'
+                          : 'border-slate-200 hover:border-emerald-300 bg-white'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold ${
+                          isEggless ? 'bg-emerald-600 text-white' : 'border border-slate-300'
+                        }`}>
+                          {isEggless ? '✓' : ''}
+                        </span>
+                        <div>
+                          <span className="text-xs font-bold text-emerald-950 block">
+                            100% Pure Eggless
+                          </span>
+                          <span className="text-[10px] text-emerald-700">
+                            Pure vegetarian whipped recipe
+                          </span>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full">
+                        Veg
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsEggless(false)}
+                      className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex items-center justify-between ${
+                        !isEggless
+                          ? 'border-amber-600 bg-amber-50/90 ring-2 ring-amber-500/30 shadow-xs'
+                          : 'border-slate-200 hover:border-amber-300 bg-white'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold ${
+                          !isEggless ? 'bg-amber-600 text-white' : 'border border-slate-300'
+                        }`}>
+                          {!isEggless ? '✓' : ''}
+                        </span>
+                        <div>
+                          <span className="text-xs font-bold text-amber-950 block">
+                            With Egg (Classic)
+                          </span>
+                          <span className="text-[10px] text-amber-700">
+                            Traditional fluffy sponge recipe
+                          </span>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full">
+                        Classic
+                      </span>
+                    </button>
+                  </div>
+                );
+              }
+
+              if (canEggless && !canEgg) {
+                return (
+                  <div className="p-3.5 bg-emerald-50/80 rounded-2xl border border-emerald-300 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="w-4 h-4 rounded-full bg-emerald-600 flex items-center justify-center text-white text-[10px] font-bold">
+                        ✓
+                      </span>
+                      <div>
+                        <span className="text-xs font-bold text-emerald-950 block">
+                          100% Pure Eggless Cake
+                        </span>
+                        <span className="text-[11px] text-emerald-700">
+                          This flavour "{selectedFlavour?.name}" is freshly baked exclusively in our pure vegetarian eggless recipe.
+                        </span>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-bold bg-emerald-200/80 text-emerald-900 px-2.5 py-1 rounded-full shrink-0">
+                      Eggless Only
+                    </span>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="p-3.5 bg-amber-50/80 rounded-2xl border border-amber-300 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="w-4 h-4 rounded-full bg-amber-600 flex items-center justify-center text-white text-[10px] font-bold">
+                      ✓
+                    </span>
+                    <div>
+                      <span className="text-xs font-bold text-amber-950 block">
+                        Baked With Fresh Eggs (Classic Recipe)
+                      </span>
+                      <span className="text-[11px] text-amber-700">
+                        This flavour "{selectedFlavour?.name}" is handcrafted exclusively using classic farm-fresh egg sponge.
+                      </span>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-bold bg-amber-200/80 text-amber-900 px-2.5 py-1 rounded-full shrink-0">
+                    With Egg Only
                   </span>
                 </div>
-                <label className="flex items-center gap-2 text-xs font-bold text-chocolate cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={isEggless}
-                    onChange={(e) => setIsEggless(e.target.checked)}
-                    className="w-4 h-4 accent-emerald-600 cursor-pointer"
-                  />
-                  <span>{isEggless ? '100% Eggless' : 'With Egg'}</span>
-                </label>
-              </div>
-            ) : dietaryConfig.allow_eggless ? (
-              <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-200 text-xs font-bold text-emerald-900 flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-emerald-600 flex-shrink-0" />
-                <span>100% Pure Vegetarian Eggless Recipe</span>
-              </div>
-            ) : (
-              <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200 text-xs font-bold text-amber-900 flex items-center gap-2">
-                <span>🥚</span>
-                <span>Baked with Farm Fresh Eggs</span>
-              </div>
-            )}
+              );
+            })()}
+          </div>
 
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
