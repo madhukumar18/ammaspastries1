@@ -122,6 +122,19 @@
   }
 }
 
+.animate-float-cake-slow {
+  animation: floatCakeSlow 5.2s ease-in-out infinite;
+}
+
+.animate-float-cake-medium {
+  animation: floatCakeMedium 4.6s ease-in-out infinite;
+}
+
+.animate-float-cake-fast {
+  animation: floatCakeFast 3.9s ease-in-out infinite;
+}
+
+
 /* Banner Text Animations - Small, Subtle, and Slow */
 @keyframes bannerFadeInDown {
   0% {
