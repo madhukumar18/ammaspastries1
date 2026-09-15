@@ -300,6 +300,11 @@ const AdminPhotoCakePage = () => {
       return;
     }
 
+    if (!newFlavourForm.is_eggless_available && !newFlavourForm.is_egg_available) {
+      showToast('Please enable at least one recipe option (Eggless or With Egg).', 'error');
+      return;
+    }
+
     const sortedWeights = sortWeightsAscending(newFlavourForm.weights);
 
     const newEntry = {
