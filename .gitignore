@@ -8,6 +8,7 @@ node_modules/
 backend/.env
 backend/.env.backup
 backend/.env.production
+frontend/.env
 frontend/.env.local
 frontend/.env.*.local
 
