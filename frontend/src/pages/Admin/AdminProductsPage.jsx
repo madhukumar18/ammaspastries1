@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import { useApp } from '../../context/AppContext';
 import {
@@ -52,6 +53,41 @@ const AdminProductsPage = () => {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [uploadSuccessName, setUploadSuccessName] = useState('');
   const fileInputRef = useRef(null);
+  const defaultCupcakeVariants = {
+    cream_options: [
+      { id: 'with_cream', name: 'With Cream' },
+      { id: 'without_cream', name: 'Without Cream' },
+    ],
+    egg_options: [
+      { id: 'egg', name: 'With Egg', badge: 'Classic' },
+      { id: 'eggless', name: '100% Pure Eggless', badge: 'Veg' },
+    ],
+    matrix: [
+      { cream_id: 'with_cream', egg_id: 'egg', price: '55', is_available: true },
+      { cream_id: 'with_cream', egg_id: 'eggless', price: '65', is_available: true },
+      { cream_id: 'without_cream', egg_id: 'egg', price: '40', is_available: true },
+      { cream_id: 'without_cream', egg_id: 'eggless', price: '45', is_available: true },
+    ],
+  };
+
+  const defaultSnackVariants = {
+    pricing_type: 'both', // 'piece' | 'weight' | 'both'
+    piece: {
+      egg_price: '40',
+      eggless_price: '50',
+      is_available: true,
+    },
+    weight: {
+      unit: 'grams', // 'grams' | 'kg'
+      value: '250g',
+      egg_price: '120',
+      eggless_price: '140',
+      is_available: true,
+    },
+  };
+
+  const [newCreamInput, setNewCreamInput] = useState('');
+  const [newEggInput, setNewEggInput] = useState('');
 
   const [formData, setFormData] = useState({
     name: '',
@@ -81,9 +117,49 @@ const AdminProductsPage = () => {
       { size_weight: '500g', price: '', discount_price: '' },
       { size_weight: '1kg', price: '', discount_price: '' },
     ],
+    enable_cupcake_matrix: false,
+    cupcake_variants: defaultCupcakeVariants,
+    enable_snack_matrix: false,
+    snack_variants: defaultSnackVariants,
   });
 
   const [dietFilter, setDietFilter] = useState(''); // '', 'true', 'false'
+  const [stockFilter, setStockFilter] = useState(''); // '', 'in_stock', 'out_of_stock'
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // Handle URL query parameters: ?action=new to open modal, ?filter=out_of_stock, ?category_id=X, ?section=slug
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const catId = params.get('category_id');
+    const sectionSlug = params.get('section') || params.get('category');
+
+    if (catId) {
+      setSelectedCat(catId);
+      setSelectedSubcat('');
+    } else if (sectionSlug && categories.length > 0) {
+      const found = categories.find((c) => c.slug === sectionSlug);
+      if (found) {
+        setSelectedCat(String(found.id));
+        setSelectedSubcat('');
+      }
+    } else if (!params.get('filter') && !params.get('action') && !location.search) {
+      setSelectedCat('');
+      setSelectedSubcat('');
+      setStockFilter('');
+    }
+
+    if (params.get('action') === 'new') {
+      handleOpenAdd();
+    }
+    if (params.get('filter') === 'out_of_stock') {
+      setStockFilter('out_of_stock');
+    } else if (params.get('filter') === 'in_stock') {
+      setStockFilter('in_stock');
+    } else if (!params.get('filter')) {
+      setStockFilter('');
+    }
+  }, [location.search, categories]);
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -97,6 +173,11 @@ const AdminProductsPage = () => {
         if (selectedSubcat) {
           list = list.filter((p) => String(p.subcategory_id) === String(selectedSubcat));
         }
+        if (stockFilter === 'out_of_stock') {
+          list = list.filter((p) => !p.is_available);
+        } else if (stockFilter === 'in_stock') {
+          list = list.filter((p) => Boolean(p.is_available));
+        }
         setProducts(list);
       }
     } catch (err) {
@@ -108,7 +189,7 @@ const AdminProductsPage = () => {
 
   useEffect(() => {
     fetchProducts();
-  }, [search, selectedCat, selectedSubcat, dietFilter]);
+  }, [search, selectedCat, selectedSubcat, dietFilter, stockFilter]);
 
   useEffect(() => {
     const fetchCats = async () => {
@@ -171,7 +252,13 @@ const AdminProductsPage = () => {
         { size_weight: '1.5kg', price: '1399', discount_price: '' },
         { size_weight: '2kg', price: '1799', discount_price: '' },
       ],
+      enable_cupcake_matrix: false,
+      cupcake_variants: defaultCupcakeVariants,
+      enable_snack_matrix: defaultCat?.slug === 'snacks' || defaultCat?.name?.toLowerCase() === 'snacks',
+      snack_variants: defaultSnackVariants,
     });
+    setNewCreamInput('');
+    setNewEggInput('');
     setImageMode('gallery');
     setModalOpen(true);
   };
@@ -179,6 +266,21 @@ const AdminProductsPage = () => {
   const handleOpenEdit = (product) => {
     setEditingId(product.id);
     setUploadSuccessName('');
+    const hasExistingMatrix = Boolean(
+      product.cupcake_variants?.matrix && product.cupcake_variants.matrix.length > 0
+    );
+    const isCupcakeProduct = Boolean(
+      product.subcategory_id === 20 ||
+      String(product.name || '').toLowerCase().includes('cup cake') ||
+      String(product.name || '').toLowerCase().includes('cupcake')
+    );
+    const isSnackProduct = Boolean(
+      product.category?.slug === 'snacks' ||
+      product.category?.name?.toLowerCase() === 'snacks' ||
+      categories.find((c) => String(c.id) === String(product.category_id))?.slug === 'snacks' ||
+      Boolean(product.snack_variants?.pricing_type)
+    );
+
     setFormData({
       name: product.name,
       sku: product.sku || '',
@@ -208,9 +310,138 @@ const AdminProductsPage = () => {
         price: v.price,
         discount_price: v.discount_price || '',
       })) || [],
+      enable_cupcake_matrix: hasExistingMatrix || isCupcakeProduct,
+      cupcake_variants: product.cupcake_variants || defaultCupcakeVariants,
+      enable_snack_matrix: isSnackProduct || Boolean(product.snack_variants),
+      snack_variants: product.snack_variants || defaultSnackVariants,
     });
+    setNewCreamInput('');
+    setNewEggInput('');
     setImageMode('gallery');
     setModalOpen(true);
+  };
+
+  const handleAddCreamOption = () => {
+    const name = newCreamInput.trim();
+    if (!name) return;
+    const id = name.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+    const existing = formData.cupcake_variants?.cream_options || [];
+    if (existing.some((c) => c.id === id)) {
+      showToast('A cream option with this name already exists.', 'warning');
+      return;
+    }
+    const updatedCream = [...existing, { id, name }];
+    const eggOpts = formData.cupcake_variants?.egg_options || [];
+    const currentMatrix = formData.cupcake_variants?.matrix || [];
+    const newCombinations = eggOpts.map((egg) => ({
+      cream_id: id,
+      egg_id: egg.id,
+      price: formData.base_price || '50',
+      is_available: true,
+    }));
+    setFormData((prev) => ({
+      ...prev,
+      cupcake_variants: {
+        ...prev.cupcake_variants,
+        cream_options: updatedCream,
+        matrix: [...currentMatrix, ...newCombinations],
+      },
+    }));
+    setNewCreamInput('');
+  };
+
+  const handleRemoveCreamOption = (creamId) => {
+    const updatedCream = (formData.cupcake_variants?.cream_options || []).filter((c) => c.id !== creamId);
+    const updatedMatrix = (formData.cupcake_variants?.matrix || []).filter((m) => m.cream_id !== creamId);
+    setFormData((prev) => ({
+      ...prev,
+      cupcake_variants: {
+        ...prev.cupcake_variants,
+        cream_options: updatedCream,
+        matrix: updatedMatrix,
+      },
+    }));
+  };
+
+  const handleAddEggOption = () => {
+    const name = newEggInput.trim();
+    if (!name) return;
+    const id = name.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+    const existing = formData.cupcake_variants?.egg_options || [];
+    if (existing.some((e) => e.id === id)) {
+      showToast('An egg option with this name already exists.', 'warning');
+      return;
+    }
+    const updatedEgg = [
+      ...existing,
+      {
+        id,
+        name,
+        badge: name.toLowerCase().includes('eggless') || name.toLowerCase().includes('veg') ? 'Veg' : 'Classic',
+      },
+    ];
+    const creamOpts = formData.cupcake_variants?.cream_options || [];
+    const currentMatrix = formData.cupcake_variants?.matrix || [];
+    const newCombinations = creamOpts.map((cream) => ({
+      cream_id: cream.id,
+      egg_id: id,
+      price: formData.base_price || '50',
+      is_available: true,
+    }));
+    setFormData((prev) => ({
+      ...prev,
+      cupcake_variants: {
+        ...prev.cupcake_variants,
+        egg_options: updatedEgg,
+        matrix: [...currentMatrix, ...newCombinations],
+      },
+    }));
+    setNewEggInput('');
+  };
+
+  const handleRemoveEggOption = (eggId) => {
+    const updatedEgg = (formData.cupcake_variants?.egg_options || []).filter((e) => e.id !== eggId);
+    const updatedMatrix = (formData.cupcake_variants?.matrix || []).filter((m) => m.egg_id !== eggId);
+    setFormData((prev) => ({
+      ...prev,
+      cupcake_variants: {
+        ...prev.cupcake_variants,
+        egg_options: updatedEgg,
+        matrix: updatedMatrix,
+      },
+    }));
+  };
+
+  const handleUpdateMatrixPrice = (creamId, eggId, price) => {
+    const updatedMatrix = (formData.cupcake_variants?.matrix || []).map((m) => {
+      if (m.cream_id === creamId && m.egg_id === eggId) {
+        return { ...m, price };
+      }
+      return m;
+    });
+    setFormData((prev) => ({
+      ...prev,
+      cupcake_variants: {
+        ...prev.cupcake_variants,
+        matrix: updatedMatrix,
+      },
+    }));
+  };
+
+  const handleToggleMatrixAvailability = (creamId, eggId) => {
+    const updatedMatrix = (formData.cupcake_variants?.matrix || []).map((m) => {
+      if (m.cream_id === creamId && m.egg_id === eggId) {
+        return { ...m, is_available: !m.is_available };
+      }
+      return m;
+    });
+    setFormData((prev) => ({
+      ...prev,
+      cupcake_variants: {
+        ...prev.cupcake_variants,
+        matrix: updatedMatrix,
+      },
+    }));
   };
 
   // Upload local image from device gallery
@@ -259,6 +490,8 @@ const AdminProductsPage = () => {
         piece_price: formData.piece_price ? Number(formData.piece_price) : null,
         piece_limit: formData.is_unlimited_pieces ? 0 : (formData.piece_limit ? Number(formData.piece_limit) : 20),
         piece_min: formData.piece_min ? Number(formData.piece_min) : 1,
+        cupcake_variants: formData.enable_cupcake_matrix ? formData.cupcake_variants : null,
+        snack_variants: formData.enable_snack_matrix ? formData.snack_variants : null,
       };
       if (editingId) {
         await api.put(`/admin/products/${editingId}`, payload);
@@ -559,8 +792,56 @@ const AdminProductsPage = () => {
             <option value="true">🌱 100% Eggless</option>
             <option value="false">🥚 With Egg</option>
           </select>
+
+          {/* Stock Availability Filter */}
+          <select
+            value={stockFilter}
+            onChange={(e) => setStockFilter(e.target.value)}
+            className="text-xs p-2 rounded-xl border border-slate-200 font-medium text-chocolate focus:outline-none"
+          >
+            <option value="">All Stock Status</option>
+            <option value="in_stock">✅ In Stock</option>
+            <option value="out_of_stock">⚠️ Out of Stock</option>
+          </select>
         </div>
       </div>
+
+      {/* Active Section Filter Banner */}
+      {(selectedCat || stockFilter || selectedSubcat) && (
+        <div className="bg-amber-500/10 border border-amber-300 rounded-2xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-chocolate shadow-2xs">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-bold text-amber-900">Showing Section Products:</span>
+            {selectedCat && (
+              <span className="bg-white border border-amber-300 text-amber-900 font-bold px-2.5 py-1 rounded-lg shadow-2xs">
+                Category: {categories.find((c) => String(c.id) === String(selectedCat))?.name || 'Selected Section'}
+              </span>
+            )}
+            {selectedSubcat && (
+              <span className="bg-white border border-amber-300 text-amber-900 font-bold px-2.5 py-1 rounded-lg shadow-2xs">
+                Variety: {filterSubcategories.find((s) => String(s.id) === String(selectedSubcat))?.name || selectedSubcat}
+              </span>
+            )}
+            {stockFilter && (
+              <span className="bg-white border border-amber-300 text-amber-900 font-bold px-2.5 py-1 rounded-lg shadow-2xs">
+                Status: {stockFilter === 'out_of_stock' ? 'Out of Stock' : 'In Stock'}
+              </span>
+            )}
+            <span className="text-slate-500 font-semibold">({products.length} products)</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedCat('');
+              setSelectedSubcat('');
+              setStockFilter('');
+              navigate('/admin/products');
+            }}
+            className="text-xs font-bold text-amber-900 hover:text-rose-600 bg-white border border-amber-300 hover:border-rose-300 px-3 py-1.5 rounded-lg transition-colors shadow-2xs cursor-pointer shrink-0"
+          >
+            Clear / Show All Products
+          </button>
+        </div>
+      )}
 
       {/* Products Table */}
       <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs overflow-hidden">
@@ -772,11 +1053,13 @@ const AdminProductsPage = () => {
                     onChange={(e) => {
                       const newCatId = e.target.value;
                       const catObj = categories.find((c) => String(c.id) === String(newCatId));
+                      const isSnacks = Boolean(catObj?.slug === 'snacks' || catObj?.name?.toLowerCase() === 'snacks');
                       const firstSub = catObj?.subcategories?.[0]?.id || '';
                       setFormData({
                         ...formData,
                         category_id: newCatId,
                         subcategory_id: firstSub,
+                        enable_snack_matrix: isSnacks || formData.enable_snack_matrix,
                       });
                     }}
                     className="w-full p-2.5 rounded-xl border border-slate-200 font-semibold focus:outline-none focus:border-amber-500"
@@ -832,7 +1115,388 @@ const AdminProductsPage = () => {
                   />
                 </div>
 
+                {/* SNACK FLEXIBLE PRICING SECTION */}
+                <div className="sm:col-span-2">
+                  <div className="rounded-2xl border-2 border-amber-300 bg-amber-50/50 p-4 sm:p-5 transition-all shadow-sm">
+                    <div className="flex items-center justify-between gap-3 mb-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl">🥐</span>
+                          <h4 className="text-sm font-black text-chocolate">
+                            Snack Flexible Pricing (Unit Type &amp; Egg / Eggless)
+                          </h4>
+                          <span className="text-[10px] font-bold bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full border border-amber-300">
+                            Snacks Mode
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-1">
+                          Configure whether this snack is sold by <strong>Piece</strong>, by <strong>Weight (Grams/Kg)</strong>, or <strong>Both</strong> with independent Egg and Eggless pricing.
+                        </p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                        <input
+                          type="checkbox"
+                          checked={!!formData.enable_snack_matrix}
+                          onChange={(e) => setFormData({ ...formData, enable_snack_matrix: e.target.checked })}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600"></div>
+                      </label>
+                    </div>
+
+                    {formData.enable_snack_matrix && (
+                      <div className="mt-4 pt-4 border-t border-amber-200/80 space-y-4">
+                        {/* 1. Unit Type Selection */}
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+                            Select Available Unit Type(s) *
+                          </label>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            {/* Only Piece */}
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  snack_variants: {
+                                    ...prev.snack_variants,
+                                    pricing_type: 'piece',
+                                  },
+                                }))
+                              }
+                              className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col gap-1 ${
+                                formData.snack_variants?.pricing_type === 'piece'
+                                  ? 'border-amber-600 bg-white ring-2 ring-amber-500/30 shadow-xs'
+                                  : 'border-slate-200 bg-white/70 hover:bg-white hover:border-slate-300'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-xs text-chocolate flex items-center gap-1.5">
+                                  <span>🍰</span>
+                                  <span>Only Piece</span>
+                                </span>
+                                {formData.snack_variants?.pricing_type === 'piece' && (
+                                  <span className="text-[10px] bg-amber-100 text-amber-900 font-bold px-1.5 py-0.2 rounded">
+                                    Active
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[11px] text-slate-500">
+                                Sold only per individual piece/slice
+                              </span>
+                            </button>
+
+                            {/* Only Weight */}
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  snack_variants: {
+                                    ...prev.snack_variants,
+                                    pricing_type: 'weight',
+                                  },
+                                }))
+                              }
+                              className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col gap-1 ${
+                                formData.snack_variants?.pricing_type === 'weight'
+                                  ? 'border-amber-600 bg-white ring-2 ring-amber-500/30 shadow-xs'
+                                  : 'border-slate-200 bg-white/70 hover:bg-white hover:border-slate-300'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-xs text-chocolate flex items-center gap-1.5">
+                                  <span>⚖️</span>
+                                  <span>Only Weight</span>
+                                </span>
+                                {formData.snack_variants?.pricing_type === 'weight' && (
+                                  <span className="text-[10px] bg-amber-100 text-amber-900 font-bold px-1.5 py-0.2 rounded">
+                                    Active
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[11px] text-slate-500">
+                                Sold by weight (Grams / Kilograms)
+                              </span>
+                            </button>
+
+                            {/* Both Piece and Weight */}
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  snack_variants: {
+                                    ...prev.snack_variants,
+                                    pricing_type: 'both',
+                                  },
+                                }))
+                              }
+                              className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col gap-1 ${
+                                formData.snack_variants?.pricing_type === 'both'
+                                  ? 'border-amber-600 bg-white ring-2 ring-amber-500/30 shadow-xs'
+                                  : 'border-slate-200 bg-white/70 hover:bg-white hover:border-slate-300'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-xs text-chocolate flex items-center gap-1.5">
+                                  <span>🥐</span>
+                                  <span>Both (Piece &amp; Weight)</span>
+                                </span>
+                                {formData.snack_variants?.pricing_type === 'both' && (
+                                  <span className="text-[10px] bg-amber-100 text-amber-900 font-bold px-1.5 py-0.2 rounded">
+                                    Active
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[11px] text-slate-500">
+                                Customer selects Piece or Weight first
+                              </span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* CONDITIONAL PANEL 1: PIECE-BASED PRICING */}
+                        {(formData.snack_variants?.pricing_type === 'piece' || formData.snack_variants?.pricing_type === 'both') && (
+                          <div className="bg-white p-4 rounded-xl border border-amber-200 shadow-2xs space-y-3">
+                            <div className="flex items-center gap-2 border-b border-amber-100 pb-2">
+                              <span className="text-base">🍰</span>
+                              <span className="text-xs font-bold text-chocolate uppercase tracking-wider">
+                                Piece-Based Pricing (Per Piece Rate)
+                              </span>
+                              {formData.snack_variants?.pricing_type === 'both' && (
+                                <span className="text-[10px] bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full font-bold ml-auto">
+                                  Option 1
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div>
+                                <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                                  <span>100% Pure Eggless Price (₹) *</span>
+                                </label>
+                                <div className="relative">
+                                  <span className="absolute left-2.5 top-2 text-xs text-slate-400 font-bold">₹</span>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    required={formData.snack_variants?.pricing_type === 'piece' || formData.snack_variants?.pricing_type === 'both'}
+                                    value={formData.snack_variants?.piece?.eggless_price || ''}
+                                    onChange={(e) =>
+                                      setFormData((prev) => ({
+                                        ...prev,
+                                        snack_variants: {
+                                          ...prev.snack_variants,
+                                          piece: {
+                                            ...prev.snack_variants?.piece,
+                                            eggless_price: e.target.value,
+                                          },
+                                        },
+                                      }))
+                                    }
+                                    placeholder="e.g. 50"
+                                    className="w-full pl-6 p-2 rounded-xl border border-slate-200 bg-white text-xs font-bold focus:outline-none focus:border-amber-500 font-mono"
+                                  />
+                                </div>
+                              </div>
+
+                              <div>
+                                <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full bg-amber-600" />
+                                  <span>With Egg Price (₹) *</span>
+                                </label>
+                                <div className="relative">
+                                  <span className="absolute left-2.5 top-2 text-xs text-slate-400 font-bold">₹</span>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    required={formData.snack_variants?.pricing_type === 'piece' || formData.snack_variants?.pricing_type === 'both'}
+                                    value={formData.snack_variants?.piece?.egg_price || ''}
+                                    onChange={(e) =>
+                                      setFormData((prev) => ({
+                                        ...prev,
+                                        snack_variants: {
+                                          ...prev.snack_variants,
+                                          piece: {
+                                            ...prev.snack_variants?.piece,
+                                            egg_price: e.target.value,
+                                          },
+                                        },
+                                      }))
+                                    }
+                                    placeholder="e.g. 40"
+                                    className="w-full pl-6 p-2 rounded-xl border border-slate-200 bg-white text-xs font-bold focus:outline-none focus:border-amber-500 font-mono"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* CONDITIONAL PANEL 2: WEIGHT-BASED PRICING */}
+                        {(formData.snack_variants?.pricing_type === 'weight' || formData.snack_variants?.pricing_type === 'both') && (
+                          <div className="bg-white p-4 rounded-xl border border-amber-200 shadow-2xs space-y-3">
+                            <div className="flex items-center gap-2 border-b border-amber-100 pb-2">
+                              <span className="text-base">⚖️</span>
+                              <span className="text-xs font-bold text-chocolate uppercase tracking-wider">
+                                Weight-Based Pricing (Grams / Kilograms)
+                              </span>
+                              {formData.snack_variants?.pricing_type === 'both' && (
+                                <span className="text-[10px] bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full font-bold ml-auto">
+                                  Option 2
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              {/* Measurement Unit Selector */}
+                              <div>
+                                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                                  Unit of Measurement *
+                                </label>
+                                <select
+                                  value={formData.snack_variants?.weight?.unit || 'grams'}
+                                  onChange={(e) =>
+                                    setFormData((prev) => ({
+                                      ...prev,
+                                      snack_variants: {
+                                        ...prev.snack_variants,
+                                        weight: {
+                                          ...prev.snack_variants?.weight,
+                                          unit: e.target.value,
+                                        },
+                                      },
+                                    }))
+                                  }
+                                  className="w-full p-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold focus:outline-none focus:border-amber-500"
+                                >
+                                  <option value="grams">Grams (g)</option>
+                                  <option value="kg">Kilograms (kg)</option>
+                                </select>
+                              </div>
+
+                              {/* Weight Portion Value */}
+                              <div>
+                                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                                  Portion / Pack Size *
+                                </label>
+                                <input
+                                  type="text"
+                                  required={formData.snack_variants?.pricing_type === 'weight' || formData.snack_variants?.pricing_type === 'both'}
+                                  value={formData.snack_variants?.weight?.value || '250g'}
+                                  onChange={(e) =>
+                                    setFormData((prev) => ({
+                                      ...prev,
+                                      snack_variants: {
+                                        ...prev.snack_variants,
+                                        weight: {
+                                          ...prev.snack_variants?.weight,
+                                          value: e.target.value,
+                                        },
+                                      },
+                                    }))
+                                  }
+                                  placeholder="e.g. 250g"
+                                  className="w-full p-2 rounded-xl border border-slate-200 bg-white text-xs font-bold focus:outline-none focus:border-amber-500"
+                                />
+                                <div className="flex gap-1 mt-1">
+                                  {(formData.snack_variants?.weight?.unit === 'kg' ? ['0.5kg', '1kg', '2kg'] : ['100g', '250g', '500g']).map((val) => (
+                                    <button
+                                      key={val}
+                                      type="button"
+                                      onClick={() =>
+                                        setFormData((prev) => ({
+                                          ...prev,
+                                          snack_variants: {
+                                            ...prev.snack_variants,
+                                            weight: {
+                                              ...prev.snack_variants?.weight,
+                                              value: val,
+                                            },
+                                          },
+                                        }))
+                                      }
+                                      className="text-[10px] bg-amber-100/70 hover:bg-amber-200 text-amber-900 px-1.5 py-0.5 rounded font-medium cursor-pointer"
+                                    >
+                                      {val}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+
+                              {/* Weight Eggless Price */}
+                              <div>
+                                <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                                  <span>100% Pure Eggless Price (₹) *</span>
+                                </label>
+                                <div className="relative">
+                                  <span className="absolute left-2.5 top-2 text-xs text-slate-400 font-bold">₹</span>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    required={formData.snack_variants?.pricing_type === 'weight' || formData.snack_variants?.pricing_type === 'both'}
+                                    value={formData.snack_variants?.weight?.eggless_price || ''}
+                                    onChange={(e) =>
+                                      setFormData((prev) => ({
+                                        ...prev,
+                                        snack_variants: {
+                                          ...prev.snack_variants,
+                                          weight: {
+                                            ...prev.snack_variants?.weight,
+                                            eggless_price: e.target.value,
+                                          },
+                                        },
+                                      }))
+                                    }
+                                    placeholder="e.g. 140"
+                                    className="w-full pl-6 p-2 rounded-xl border border-slate-200 bg-white text-xs font-bold focus:outline-none focus:border-amber-500 font-mono"
+                                  />
+                                </div>
+                              </div>
+
+                              {/* Weight With Egg Price */}
+                              <div>
+                                <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full bg-amber-600" />
+                                  <span>With Egg Price (₹) *</span>
+                                </label>
+                                <div className="relative">
+                                  <span className="absolute left-2.5 top-2 text-xs text-slate-400 font-bold">₹</span>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    required={formData.snack_variants?.pricing_type === 'weight' || formData.snack_variants?.pricing_type === 'both'}
+                                    value={formData.snack_variants?.weight?.egg_price || ''}
+                                    onChange={(e) =>
+                                      setFormData((prev) => ({
+                                        ...prev,
+                                        snack_variants: {
+                                          ...prev.snack_variants,
+                                          weight: {
+                                            ...prev.snack_variants?.weight,
+                                            egg_price: e.target.value,
+                                          },
+                                        },
+                                      }))
+                                    }
+                                    placeholder="e.g. 120"
+                                    className="w-full pl-6 p-2 rounded-xl border border-slate-200 bg-white text-xs font-bold focus:outline-none focus:border-amber-500 font-mono"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 {/* PORTION & WEIGHT CONFIGURATION SECTION */}
+                {!formData.enable_snack_matrix && (
                 <div className="sm:col-span-2 bg-gradient-to-br from-amber-50/70 to-white p-4 sm:p-5 rounded-2xl border-2 border-amber-200/80 space-y-4">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
@@ -1416,6 +2080,196 @@ const AdminProductsPage = () => {
                       </div>
                     </div>
                   )}
+                </div>
+                )}
+
+                {/* Cupcake Two-Level Variant Matrix (Cream Type × Egg Type) */}
+                <div className="sm:col-span-2 pt-2">
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50/40 p-4 sm:p-5 transition-all">
+                    <div className="flex items-center justify-between gap-3 mb-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">🧁</span>
+                          <h4 className="text-sm font-bold text-chocolate">Cupcake Variant Matrix (Cream Type × Egg Type)</h4>
+                          <span className="text-[10px] font-bold bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full border border-amber-300">
+                            Two-Level Pricing
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-1">
+                          Configure independent pricing for combinations of Cream types (With Cream / Without Cream) and Egg types (Egg / Eggless).
+                        </p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                        <input
+                          type="checkbox"
+                          checked={!!formData.enable_cupcake_matrix}
+                          onChange={(e) => setFormData({ ...formData, enable_cupcake_matrix: e.target.checked })}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600"></div>
+                      </label>
+                    </div>
+
+                    {formData.enable_cupcake_matrix && (
+                      <div className="mt-4 pt-4 border-t border-amber-200/70 space-y-5">
+                        {/* 1. Manage Cream Options */}
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                            1. Cream Options (e.g. With Cream, Without Cream)
+                          </label>
+                          <div className="flex flex-wrap gap-2 mb-2.5">
+                            {(formData.cupcake_variants?.cream_options || []).map((cream) => (
+                              <span
+                                key={cream.id}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-amber-300 text-xs font-semibold text-slate-800 shadow-2xs"
+                              >
+                                {cream.name}
+                                {(formData.cupcake_variants?.cream_options || []).length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveCreamOption(cream.id)}
+                                    className="text-rose-500 hover:text-rose-700 font-bold ml-1 cursor-pointer text-xs"
+                                    title="Delete cream option"
+                                  >
+                                    ✕
+                                  </button>
+                                )}
+                              </span>
+                            ))}
+                          </div>
+                          <div className="flex gap-2 max-w-sm">
+                            <input
+                              type="text"
+                              value={newCreamInput}
+                              onChange={(e) => setNewCreamInput(e.target.value)}
+                              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddCreamOption(); } }}
+                              placeholder="New cream option (e.g. Extra Cream)"
+                              className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-slate-300 bg-white focus:ring-1 focus:ring-amber-500 focus:outline-none"
+                            />
+                            <button
+                              type="button"
+                              onClick={handleAddCreamOption}
+                              className="px-3 py-1.5 bg-amber-600 text-white rounded-lg text-xs font-bold hover:bg-amber-700 cursor-pointer transition shadow-2xs"
+                            >
+                              + Add Cream
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* 2. Manage Egg Options */}
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                            2. Egg / Recipe Options (e.g. With Egg, 100% Pure Eggless)
+                          </label>
+                          <div className="flex flex-wrap gap-2 mb-2.5">
+                            {(formData.cupcake_variants?.egg_options || []).map((egg) => (
+                              <span
+                                key={egg.id}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-emerald-300 text-xs font-semibold text-slate-800 shadow-2xs"
+                              >
+                                <span className={`w-2 h-2 rounded-full ${egg.id.includes('eggless') ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                                {egg.name}
+                                {(formData.cupcake_variants?.egg_options || []).length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveEggOption(egg.id)}
+                                    className="text-rose-500 hover:text-rose-700 font-bold ml-1 cursor-pointer text-xs"
+                                    title="Delete egg option"
+                                  >
+                                    ✕
+                                  </button>
+                                )}
+                              </span>
+                            ))}
+                          </div>
+                          <div className="flex gap-2 max-w-sm">
+                            <input
+                              type="text"
+                              value={newEggInput}
+                              onChange={(e) => setNewEggInput(e.target.value)}
+                              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddEggOption(); } }}
+                              placeholder="New egg/dietary option"
+                              className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-slate-300 bg-white focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                            />
+                            <button
+                              type="button"
+                              onClick={handleAddEggOption}
+                              className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 cursor-pointer transition shadow-2xs"
+                            >
+                              + Add Egg Option
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* 3. Combinations Matrix Pricing Table */}
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+                            3. Combination Prices (Matrix)
+                          </label>
+                          <div className="bg-white rounded-xl border border-amber-200 overflow-hidden shadow-2xs">
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-left text-xs">
+                                <thead className="bg-amber-100/60 text-slate-700 font-bold border-b border-amber-200 uppercase tracking-wider">
+                                  <tr>
+                                    <th className="px-3.5 py-2.5">Cream Type</th>
+                                    <th className="px-3.5 py-2.5">Egg / Recipe</th>
+                                    <th className="px-3.5 py-2.5">Price (₹)</th>
+                                    <th className="px-3.5 py-2.5 text-center">Status</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-amber-100">
+                                  {(formData.cupcake_variants?.matrix || []).map((m, idx) => {
+                                    const creamName = (formData.cupcake_variants?.cream_options || []).find((c) => c.id === m.cream_id)?.name || m.cream_id;
+                                    const eggName = (formData.cupcake_variants?.egg_options || []).find((e) => e.id === m.egg_id)?.name || m.egg_id;
+                                    return (
+                                      <tr key={`${m.cream_id}_${m.egg_id}_${idx}`} className="hover:bg-amber-50/40 transition-colors">
+                                        <td className="px-3.5 py-2.5 font-semibold text-slate-800">
+                                          {creamName}
+                                        </td>
+                                        <td className="px-3.5 py-2.5 text-slate-700">
+                                          <span className="inline-flex items-center gap-1.5">
+                                            <span className={`w-2 h-2 rounded-full ${m.egg_id.includes('eggless') ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                                            {eggName}
+                                          </span>
+                                        </td>
+                                        <td className="px-3.5 py-2.5">
+                                          <div className="flex items-center gap-1">
+                                            <span className="text-slate-400 font-semibold">₹</span>
+                                            <input
+                                              type="number"
+                                              value={m.price}
+                                              onChange={(e) => handleUpdateMatrixPrice(m.cream_id, m.egg_id, e.target.value)}
+                                              placeholder="Price"
+                                              className="w-24 px-2.5 py-1 text-xs font-bold rounded-lg border border-slate-300 bg-white focus:ring-1 focus:ring-amber-500 focus:outline-none"
+                                              min="0"
+                                              step="1"
+                                            />
+                                          </div>
+                                        </td>
+                                        <td className="px-3.5 py-2.5 text-center">
+                                          <button
+                                            type="button"
+                                            onClick={() => handleToggleMatrixAvailability(m.cream_id, m.egg_id)}
+                                            className={`px-2 py-1 rounded-md text-[11px] font-bold cursor-pointer transition ${
+                                              m.is_available !== false
+                                                ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
+                                                : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+                                            }`}
+                                          >
+                                            {m.is_available !== false ? 'Available' : 'Unavailable'}
+                                          </button>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Dietary Selection: 100% Eggless vs With Egg */}

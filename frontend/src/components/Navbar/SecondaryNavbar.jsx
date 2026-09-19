@@ -105,10 +105,20 @@ const SecondaryNavbar = ({ mobileMenuOpen, setMobileMenuOpen }) => {
     api.get('/categories')
       .then((res) => {
         if (!isMounted || !res.data?.data) return;
-        const apiCats = res.data.data;
+        const rawCats = res.data.data;
+        const apiCats = Array.isArray(rawCats) ? rawCats : (typeof rawCats === 'object' && rawCats !== null ? Object.values(rawCats) : []);
+        if (!Array.isArray(apiCats) || apiCats.length === 0) return;
         setCategories((prev) =>
           prev.map((cat) => {
             if (!cat.slug) return cat;
+            // Theme Cakes must NEVER have dropdown/subcategories in navbar - stays a direct link
+            if (cat.slug === 'theme-cakes' || cat.name === 'Theme Cakes') {
+              return {
+                ...cat,
+                href: '/category/theme-cakes',
+                subcategories: [],
+              };
+            }
             const match = apiCats.find((c) => c.slug === cat.slug);
             if (match && match.subcategories && match.subcategories.length > 0) {
               return {

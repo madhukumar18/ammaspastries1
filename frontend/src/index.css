@@ -214,3 +214,45 @@
   animation: bannerFadeInUp 1.6s cubic-bezier(0.22, 1, 0.36, 1) both;
   animation-delay: 0.88s;
 }
+
+/* =========================================================
+   CATEGORY CAROUSEL FLOATING & DEPTH SYSTEM
+   Subpixel-crisp hardware-accelerated floating (no blur)
+   ========================================================= */
+@keyframes cardFloat {
+  0%, 100% {
+    transform: translateY(0px) translateZ(0);
+  }
+  50% {
+    transform: translateY(-5px) translateZ(0);
+  }
+}
+
+.floating-card-3d {
+  animation: cardFloat 4.8s ease-in-out infinite;
+  backface-visibility: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  will-change: transform;
+}
+
+.floating-card-3d:hover {
+  animation-play-state: paused;
+}
+
+/* Staggered offsets for natural organic movement */
+.card-float-delay-0 { animation-delay: 0s; }
+.card-float-delay-1 { animation-delay: 0.8s; }
+.card-float-delay-2 { animation-delay: 1.6s; }
+.card-float-delay-3 { animation-delay: 2.4s; }
+.card-float-delay-4 { animation-delay: 3.2s; }
+.card-float-delay-5 { animation-delay: 4.0s; }
+
+/* Accessibility & Battery Optimization */
+@media (prefers-reduced-motion: reduce) {
+  .floating-card-3d {
+    animation: none !important;
+  }
+}
+

@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use App\Models\Category;
 use App\Models\Subcategory;
+use App\Services\CacheManagerService;
 
 class AdminCategoryController extends Controller
 {
@@ -28,6 +29,8 @@ class AdminCategoryController extends Controller
 
         $validated['slug'] = Str::slug($validated['name']);
         $category = Category::create($validated);
+
+        app(CacheManagerService::class)->clearCatalog();
 
         return response()->json([
             'success' => true,
@@ -54,6 +57,8 @@ class AdminCategoryController extends Controller
 
         $category->update($validated);
 
+        app(CacheManagerService::class)->clearCatalog();
+
         return response()->json([
             'success' => true,
             'message' => 'Category updated successfully!',
@@ -65,6 +70,8 @@ class AdminCategoryController extends Controller
     {
         $category = Category::findOrFail($id);
         $category->delete();
+
+        app(CacheManagerService::class)->clearCatalog();
 
         return response()->json([
             'success' => true,
@@ -79,11 +86,15 @@ class AdminCategoryController extends Controller
             'category_id' => 'required|exists:categories,id',
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
+            'image_url' => 'nullable|string',
             'display_order' => 'integer',
+            'is_active' => 'boolean',
         ]);
 
         $validated['slug'] = Str::slug($validated['name']);
         $subcategory = Subcategory::create($validated);
+
+        app(CacheManagerService::class)->clearCatalog();
 
         return response()->json([
             'success' => true,
@@ -100,7 +111,9 @@ class AdminCategoryController extends Controller
             'name' => 'sometimes|required|string|max:255',
             'category_id' => 'sometimes|required|exists:categories,id',
             'description' => 'nullable|string',
+            'image_url' => 'nullable|string',
             'display_order' => 'integer',
+            'is_active' => 'boolean',
         ]);
 
         if (isset($validated['name'])) {
@@ -108,6 +121,8 @@ class AdminCategoryController extends Controller
         }
 
         $subcategory->update($validated);
+
+        app(CacheManagerService::class)->clearCatalog();
 
         return response()->json([
             'success' => true,
@@ -120,6 +135,8 @@ class AdminCategoryController extends Controller
     {
         $subcategory = Subcategory::findOrFail($id);
         $subcategory->delete();
+
+        app(CacheManagerService::class)->clearCatalog();
 
         return response()->json([
             'success' => true,

@@ -117,6 +117,20 @@ class AdminRistaPosController extends Controller
     }
 
     /**
+     * Fetch and sync all outlets directly from Rista POS
+     */
+    public function syncOutlets()
+    {
+        $result = $this->ristaService->syncOutlets();
+
+        return response()->json([
+            'success' => $result['success'],
+            'message' => $result['message'] ?? 'Outlets sync complete',
+            'data' => $result,
+        ], $result['success'] ? 200 : 500);
+    }
+
+    /**
      * List orders with POS synchronization status & payloads
      */
     public function getOrders(Request $request)

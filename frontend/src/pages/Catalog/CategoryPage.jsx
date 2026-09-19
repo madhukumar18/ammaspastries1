@@ -4,9 +4,9 @@ import api from '../../services/api';
 import ProductCard from '../../components/UI/ProductCard';
 import { ProductCardSkeleton } from '../../components/UI/SkeletonLoader';
 import { Filter, SlidersHorizontal, Cake, Check, Sparkles } from 'lucide-react';
+import ThemeCakePage from '../ThemeCake/ThemeCakePage';
 
-const CategoryPage = () => {
-  const { slug } = useParams();
+const CategoryContent = ({ slug }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const currentSub = searchParams.get('sub');
 
@@ -225,6 +225,14 @@ const CategoryPage = () => {
 
     </div>
   );
+};
+
+const CategoryPage = () => {
+  const { slug } = useParams();
+  if (slug === 'theme-cakes') {
+    return <ThemeCakePage />;
+  }
+  return <CategoryContent slug={slug} />;
 };
 
 export default CategoryPage;

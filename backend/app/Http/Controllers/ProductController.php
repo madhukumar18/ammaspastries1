@@ -8,6 +8,7 @@ use App\Models\Category;
 use App\Models\Subcategory;
 use App\Models\DreamCake;
 use App\Models\GiftingProduct;
+use Illuminate\Support\Facades\Cache;
 
 class ProductController extends Controller
 {
@@ -16,16 +17,20 @@ class ProductController extends Controller
         $query = Product::with(['category', 'subcategory', 'variants', 'images'])
             ->where('is_available', true);
 
-        // Filter by category slug
-        if ($request->filled('category')) {
+        // Filter by category slug or ID
+        if ($request->filled('category_id')) {
+            $query->where('category_id', $request->input('category_id'));
+        } elseif ($request->filled('category')) {
             $catSlug = $request->input('category');
             $query->whereHas('category', function ($q) use ($catSlug) {
                 $q->where('slug', $catSlug);
             });
         }
 
-        // Filter by subcategory slug
-        if ($request->filled('subcategory') || $request->filled('sub')) {
+        // Filter by subcategory slug or ID
+        if ($request->filled('subcategory_id')) {
+            $query->where('subcategory_id', $request->input('subcategory_id'));
+        } elseif ($request->filled('subcategory') || $request->filled('sub')) {
             $subSlug = $request->input('subcategory') ?: $request->input('sub');
             $query->whereHas('subcategory', function ($q) use ($subSlug) {
                 $q->where('slug', $subSlug);
@@ -93,63 +98,78 @@ class ProductController extends Controller
         }
 
         $perPage = min((int) $request->input('per_page', 12), 48);
-        $products = $query->paginate($perPage);
+        $cacheKey = 'products:list:' . md5(json_encode($request->all()));
+
+        $result = Cache::remember($cacheKey, 3600, function () use ($query, $perPage) {
+            $products = $query->paginate($perPage);
+            return [
+                'data' => $products->getCollection()->toArray(),
+                'pagination' => [
+                    'total' => $products->total(),
+                    'current_page' => $products->currentPage(),
+                    'last_page' => $products->lastPage(),
+                    'per_page' => $products->perPage(),
+                ]
+            ];
+        });
 
         return response()->json([
             'success' => true,
-            'data' => $products->items(),
-            'pagination' => [
-                'total' => $products->total(),
-                'current_page' => $products->currentPage(),
-                'last_page' => $products->lastPage(),
-                'per_page' => $products->perPage(),
-            ]
+            'data' => $result['data'],
+            'pagination' => $result['pagination'],
+            'cached' => true,
         ]);
     }
 
     public function show($slug)
     {
-        $product = Product::with([
-            'category',
-            'subcategory',
-            'variants' => function ($q) {
-                $q->where('is_available', true)->orderBy('price', 'asc');
-            },
-            'images',
-            'approvedReviews' => function ($q) {
-                $q->orderBy('created_at', 'desc');
-            }
-        ])
-        ->where('slug', $slug)
-        ->where('is_available', true)
-        ->firstOrFail();
+        $cacheKey = 'products:show:' . $slug;
 
-        // Related products in same category with full variants and category details
-        $related = Product::with(['category', 'variants', 'images'])
-            ->where('category_id', $product->category_id)
-            ->where('id', '!=', $product->id)
+        $data = Cache::remember($cacheKey, 3600, function () use ($slug) {
+            $product = Product::with([
+                'category',
+                'subcategory',
+                'variants' => function ($q) {
+                    $q->where('is_available', true)->orderBy('price', 'asc');
+                },
+                'images',
+                'approvedReviews' => function ($q) {
+                    $q->orderBy('created_at', 'desc');
+                }
+            ])
+            ->where('slug', $slug)
             ->where('is_available', true)
-            ->limit(12)
-            ->get();
+            ->firstOrFail();
 
-        // If fewer than 6 related items in same category, supplement with other popular products
-        if ($related->count() < 6) {
-            $existingIds = $related->pluck('id')->push($product->id)->all();
-            $supplements = Product::with(['category', 'variants', 'images'])
-                ->whereNotIn('id', $existingIds)
+            // Related products in same category with full variants and category details
+            $related = Product::with(['category', 'variants', 'images'])
+                ->where('category_id', $product->category_id)
+                ->where('id', '!=', $product->id)
                 ->where('is_available', true)
-                ->orderBy('is_popular', 'desc')
-                ->limit(12 - $related->count())
+                ->limit(12)
                 ->get();
-            $related = $related->concat($supplements);
-        }
+
+            // If fewer than 6 related items in same category, supplement with other popular products
+            if ($related->count() < 6) {
+                $existingIds = $related->pluck('id')->push($product->id)->all();
+                $supplements = Product::with(['category', 'variants', 'images'])
+                    ->whereNotIn('id', $existingIds)
+                    ->where('is_available', true)
+                    ->orderBy('is_popular', 'desc')
+                    ->limit(12 - $related->count())
+                    ->get();
+                $related = $related->concat($supplements);
+            }
+
+            return [
+                'product' => $product->toArray(),
+                'related' => $related->toArray(),
+            ];
+        });
 
         return response()->json([
             'success' => true,
-            'data' => [
-                'product' => $product,
-                'related' => $related,
-            ]
+            'data' => $data,
         ]);
     }
 

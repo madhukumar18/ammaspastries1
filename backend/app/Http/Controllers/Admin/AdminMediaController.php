@@ -15,7 +15,7 @@ class AdminMediaController extends Controller
     {
         $request->validate([
             'image' => 'required|image|mimes:jpeg,png,webp,jpg,gif|max:30720', // max 30MB
-            'folder' => 'nullable|string|in:products,banners,general',
+            'folder' => 'nullable|string|in:products,banners,general,theme-cakes,categories',
         ]);
 
         $folder = $request->input('folder', 'products');

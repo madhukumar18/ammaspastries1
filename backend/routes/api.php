@@ -34,6 +34,8 @@ use App\Http\Controllers\Admin\AdminMediaController;
 use App\Http\Controllers\Admin\AdminRistaPosController;
 use App\Http\Controllers\Admin\AdminSecurityLogController;
 use App\Http\Controllers\Admin\AdminCategoryImageController;
+use App\Http\Controllers\Admin\AdminSubAdminController;
+use App\Http\Controllers\Admin\AdminCacheController;
 
 /*
 |--------------------------------------------------------------------------
@@ -137,111 +139,156 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
     Route::post('/media/upload', [AdminMediaController::class, 'upload']);
 
     // Dashboard & Sales Analytics
-    Route::get('/dashboard/summary', [AdminDashboardController::class, 'summary']);
-    Route::get('/dashboard/sales-bar-chart', [AdminDashboardController::class, 'salesBarChart']);
-    Route::get('/dashboard/sales-line-graph', [AdminDashboardController::class, 'salesLineGraph']);
+    Route::middleware('permission:dashboard')->group(function () {
+        Route::get('/dashboard/summary', [AdminDashboardController::class, 'summary']);
+        Route::get('/dashboard/sales-bar-chart', [AdminDashboardController::class, 'salesBarChart']);
+        Route::get('/dashboard/sales-line-graph', [AdminDashboardController::class, 'salesLineGraph']);
+    });
 
     // Products Management
-    Route::get('/products/export-csv', [AdminBulkProductController::class, 'exportCsv']);
-    Route::get('/products/csv-template', [AdminBulkProductController::class, 'downloadTemplate']);
-    Route::post('/products/bulk-upload', [AdminBulkProductController::class, 'importCsv']);
-    Route::get('/products', [AdminProductController::class, 'index']);
-    Route::post('/products', [AdminProductController::class, 'store']);
-    Route::get('/products/{id}', [AdminProductController::class, 'show']);
-    Route::put('/products/{id}', [AdminProductController::class, 'update']);
-    Route::delete('/products/{id}', [AdminProductController::class, 'destroy']);
-    Route::post('/products/{id}/toggle-field', [AdminProductController::class, 'toggleField']);
+    Route::middleware('permission:products|theme_cakes')->group(function () {
+        Route::get('/products/export-csv', [AdminBulkProductController::class, 'exportCsv']);
+        Route::get('/products/csv-template', [AdminBulkProductController::class, 'downloadTemplate']);
+        Route::post('/products/bulk-upload', [AdminBulkProductController::class, 'importCsv']);
+        Route::get('/products', [AdminProductController::class, 'index']);
+        Route::post('/products', [AdminProductController::class, 'store']);
+        Route::get('/products/{id}', [AdminProductController::class, 'show']);
+        Route::put('/products/{id}', [AdminProductController::class, 'update']);
+        Route::delete('/products/{id}', [AdminProductController::class, 'destroy']);
+        Route::post('/products/{id}/toggle-field', [AdminProductController::class, 'toggleField']);
+    });
 
     // Categories & Subcategories
-    Route::get('/categories', [AdminCategoryController::class, 'index']);
-    Route::post('/categories', [AdminCategoryController::class, 'store']);
-    Route::put('/categories/{id}', [AdminCategoryController::class, 'update']);
-    Route::delete('/categories/{id}', [AdminCategoryController::class, 'destroy']);
-    Route::post('/subcategories', [AdminCategoryController::class, 'storeSubcategory']);
-    Route::put('/subcategories/{id}', [AdminCategoryController::class, 'updateSubcategory']);
-    Route::delete('/subcategories/{id}', [AdminCategoryController::class, 'destroySubcategory']);
+    Route::middleware('permission:categories|theme_cakes')->group(function () {
+        Route::get('/categories', [AdminCategoryController::class, 'index']);
+        Route::post('/categories', [AdminCategoryController::class, 'store']);
+        Route::put('/categories/{id}', [AdminCategoryController::class, 'update']);
+        Route::delete('/categories/{id}', [AdminCategoryController::class, 'destroy']);
+        Route::post('/subcategories', [AdminCategoryController::class, 'storeSubcategory']);
+        Route::put('/subcategories/{id}', [AdminCategoryController::class, 'updateSubcategory']);
+        Route::delete('/subcategories/{id}', [AdminCategoryController::class, 'destroySubcategory']);
+
+        // Category Images Showcase
+        Route::get('/category-images', [AdminCategoryImageController::class, 'index']);
+        Route::get('/category-images/settings', [AdminCategoryImageController::class, 'getSettings']);
+        Route::post('/category-images/settings', [AdminCategoryImageController::class, 'updateSettings']);
+        Route::post('/category-images', [AdminCategoryImageController::class, 'store']);
+        Route::put('/category-images/{id}', [AdminCategoryImageController::class, 'update']);
+        Route::delete('/category-images/{id}', [AdminCategoryImageController::class, 'destroy']);
+        Route::patch('/category-images/{id}/toggle-status', [AdminCategoryImageController::class, 'toggleStatus']);
+        Route::post('/category-images/reset-defaults', [AdminCategoryImageController::class, 'resetDefaults']);
+    });
 
     // Outlets Management
-    Route::get('/outlets', [AdminOutletController::class, 'index']);
-    Route::post('/outlets', [AdminOutletController::class, 'store']);
-    Route::post('/outlets/parse-map-link', [AdminOutletController::class, 'parseMapLink']);
-    Route::put('/outlets/{id}', [AdminOutletController::class, 'update']);
-    Route::delete('/outlets/{id}', [AdminOutletController::class, 'destroy']);
+    Route::middleware('permission:outlets')->group(function () {
+        Route::get('/outlets', [AdminOutletController::class, 'index']);
+        Route::post('/outlets', [AdminOutletController::class, 'store']);
+        Route::post('/outlets/parse-map-link', [AdminOutletController::class, 'parseMapLink']);
+        Route::put('/outlets/{id}', [AdminOutletController::class, 'update']);
+        Route::delete('/outlets/{id}', [AdminOutletController::class, 'destroy']);
+    });
 
     // Orders Management
-    Route::get('/orders', [AdminOrderController::class, 'index']);
-    Route::get('/orders/{id}', [AdminOrderController::class, 'show']);
-    Route::put('/orders/{id}/status', [AdminOrderController::class, 'updateStatus']);
+    Route::middleware('permission:orders')->group(function () {
+        Route::get('/orders', [AdminOrderController::class, 'index']);
+        Route::get('/orders/{id}', [AdminOrderController::class, 'show']);
+        Route::put('/orders/{id}/status', [AdminOrderController::class, 'updateStatus']);
+    });
 
     // Protected Photo Cake Access & Management
-    Route::get('/photo-cake/management', [AdminPhotoCakeController::class, 'getManagementConfig']);
-    Route::post('/photo-cake/management', [AdminPhotoCakeController::class, 'saveManagementConfig']);
-    Route::post('/photo-cake/shape-image', [AdminPhotoCakeController::class, 'uploadShapeImage']);
-    Route::get('/photo-cake/{uploadId}/preview', [AdminPhotoCakeController::class, 'preview']);
-    Route::get('/photo-cake/{uploadId}/download', [AdminPhotoCakeController::class, 'download']);
+    Route::middleware('permission:photo_cakes')->group(function () {
+        Route::get('/photo-cake/management', [AdminPhotoCakeController::class, 'getManagementConfig']);
+        Route::post('/photo-cake/management', [AdminPhotoCakeController::class, 'saveManagementConfig']);
+        Route::post('/photo-cake/shape-image', [AdminPhotoCakeController::class, 'uploadShapeImage']);
+        Route::get('/photo-cake/{uploadId}/preview', [AdminPhotoCakeController::class, 'preview']);
+        Route::get('/photo-cake/{uploadId}/download', [AdminPhotoCakeController::class, 'download']);
+    });
 
     // Banners
-    Route::get('/banners', [AdminBannerController::class, 'index']);
-    Route::post('/banners', [AdminBannerController::class, 'store']);
-    Route::put('/banners/{id}', [AdminBannerController::class, 'update']);
-    Route::delete('/banners/{id}', [AdminBannerController::class, 'destroy']);
-
-    // Category Images Showcase
-    Route::get('/category-images', [AdminCategoryImageController::class, 'index']);
-    Route::get('/category-images/settings', [AdminCategoryImageController::class, 'getSettings']);
-    Route::post('/category-images/settings', [AdminCategoryImageController::class, 'updateSettings']);
-    Route::post('/category-images', [AdminCategoryImageController::class, 'store']);
-    Route::put('/category-images/{id}', [AdminCategoryImageController::class, 'update']);
-    Route::delete('/category-images/{id}', [AdminCategoryImageController::class, 'destroy']);
-    Route::patch('/category-images/{id}/toggle-status', [AdminCategoryImageController::class, 'toggleStatus']);
-    Route::post('/category-images/reset-defaults', [AdminCategoryImageController::class, 'resetDefaults']);
+    Route::middleware('permission:banners')->group(function () {
+        Route::get('/banners', [AdminBannerController::class, 'index']);
+        Route::post('/banners', [AdminBannerController::class, 'store']);
+        Route::put('/banners/{id}', [AdminBannerController::class, 'update']);
+        Route::delete('/banners/{id}', [AdminBannerController::class, 'destroy']);
+    });
 
     // Gifting & Dream Cake
-    Route::get('/gifting', [AdminGiftingController::class, 'getGifting']);
-    Route::post('/gifting', [AdminGiftingController::class, 'addGifting']);
-    Route::delete('/gifting/{id}', [AdminGiftingController::class, 'removeGifting']);
-    Route::get('/dream-cake', [AdminGiftingController::class, 'getDreamCake']);
-    Route::post('/dream-cake', [AdminGiftingController::class, 'updateDreamCake']);
+    Route::middleware('permission:gifting')->group(function () {
+        Route::get('/gifting', [AdminGiftingController::class, 'getGifting']);
+        Route::post('/gifting', [AdminGiftingController::class, 'addGifting']);
+        Route::delete('/gifting/{id}', [AdminGiftingController::class, 'removeGifting']);
+        Route::get('/dream-cake', [AdminGiftingController::class, 'getDreamCake']);
+        Route::post('/dream-cake', [AdminGiftingController::class, 'updateDreamCake']);
+    });
 
     // Customer Review Moderation
-    Route::get('/reviews', [AdminReviewController::class, 'index']);
-    Route::post('/reviews/{id}/toggle-approval', [AdminReviewController::class, 'toggleApproval']);
-    Route::post('/reviews/{id}/toggle-featured', [AdminReviewController::class, 'toggleFeatured']);
-    Route::delete('/reviews/{id}', [AdminReviewController::class, 'destroy']);
+    Route::middleware('permission:reviews')->group(function () {
+        Route::get('/reviews', [AdminReviewController::class, 'index']);
+        Route::post('/reviews/{id}/toggle-approval', [AdminReviewController::class, 'toggleApproval']);
+        Route::post('/reviews/{id}/toggle-featured', [AdminReviewController::class, 'toggleFeatured']);
+        Route::delete('/reviews/{id}', [AdminReviewController::class, 'destroy']);
+    });
 
     // Corporate Bulk Imports & Enquiries
-    Route::get('/bulk-imports', [AdminBulkImportController::class, 'index']);
-    Route::get('/bulk-orders/{id}', [AdminBulkImportController::class, 'show']);
-    Route::put('/bulk-orders/{id}/status', [AdminBulkImportController::class, 'updateStatus']);
-    Route::delete('/bulk-orders/{id}', [AdminBulkImportController::class, 'destroy']);
+    Route::middleware('permission:bulk_orders')->group(function () {
+        Route::get('/bulk-imports', [AdminBulkImportController::class, 'index']);
+        Route::get('/bulk-orders/{id}', [AdminBulkImportController::class, 'show']);
+        Route::put('/bulk-orders/{id}/status', [AdminBulkImportController::class, 'updateStatus']);
+        Route::delete('/bulk-orders/{id}', [AdminBulkImportController::class, 'destroy']);
+    });
 
-    // Franchise & Contact Enquiries
-    Route::get('/franchise-enquiries', [AdminEnquiryController::class, 'getFranchise']);
-    Route::post('/franchise-enquiries/{id}/toggle-read', [AdminEnquiryController::class, 'toggleFranchiseRead']);
-    Route::delete('/franchise-enquiries/{id}', [AdminEnquiryController::class, 'deleteFranchise']);
-    Route::get('/contact-enquiries', [AdminEnquiryController::class, 'getContact']);
-    Route::post('/contact-enquiries/{id}/toggle-read', [AdminEnquiryController::class, 'toggleContactRead']);
-    Route::delete('/contact-enquiries/{id}', [AdminEnquiryController::class, 'deleteContact']);
+    // Franchise Enquiries
+    Route::middleware('permission:franchise_enquiries')->group(function () {
+        Route::get('/franchise-enquiries', [AdminEnquiryController::class, 'getFranchise']);
+        Route::post('/franchise-enquiries/{id}/toggle-read', [AdminEnquiryController::class, 'toggleFranchiseRead']);
+        Route::delete('/franchise-enquiries/{id}', [AdminEnquiryController::class, 'deleteFranchise']);
+    });
 
-    // Dynamic Site Content Settings
+    // Contact Enquiries
+    Route::middleware('permission:contact_enquiries')->group(function () {
+        Route::get('/contact-enquiries', [AdminEnquiryController::class, 'getContact']);
+        Route::post('/contact-enquiries/{id}/toggle-read', [AdminEnquiryController::class, 'toggleContactRead']);
+        Route::delete('/contact-enquiries/{id}', [AdminEnquiryController::class, 'deleteContact']);
+    });
+
+    // Dynamic Site Content Settings (Super Admin)
     Route::get('/settings', [AdminSettingsController::class, 'getSettings']);
     Route::post('/settings', [AdminSettingsController::class, 'updateSettings']);
     Route::get('/policies', [AdminSettingsController::class, 'getPolicies']);
     Route::put('/policies/{slug}', [AdminSettingsController::class, 'updatePolicy']);
 
     // Rista POS (DotPe) Integration
-    Route::get('/rista-pos/config', [AdminRistaPosController::class, 'getConfig']);
-    Route::post('/rista-pos/test-connection', [AdminRistaPosController::class, 'testConnection']);
-    Route::get('/rista-pos/outlets', [AdminRistaPosController::class, 'getOutlets']);
-    Route::put('/rista-pos/outlets/{id}', [AdminRistaPosController::class, 'updateOutlet']);
-    Route::get('/rista-pos/orders', [AdminRistaPosController::class, 'getOrders']);
-    Route::post('/rista-pos/orders/{id}/sync', [AdminRistaPosController::class, 'syncOrder']);
+    Route::middleware('permission:rista_pos')->group(function () {
+        Route::get('/rista-pos/config', [AdminRistaPosController::class, 'getConfig']);
+        Route::post('/rista-pos/test-connection', [AdminRistaPosController::class, 'testConnection']);
+        Route::get('/rista-pos/outlets', [AdminRistaPosController::class, 'getOutlets']);
+        Route::post('/rista-pos/outlets/sync', [AdminRistaPosController::class, 'syncOutlets']);
+        Route::put('/rista-pos/outlets/{id}', [AdminRistaPosController::class, 'updateOutlet']);
+        Route::get('/rista-pos/orders', [AdminRistaPosController::class, 'getOrders']);
+        Route::post('/rista-pos/orders/{id}/sync', [AdminRistaPosController::class, 'syncOrder']);
+    });
 
-    // Security Threat & Error Logs
+    // Security Threat & Error Logs (Super Admin)
     Route::get('/security-logs', [AdminSecurityLogController::class, 'index']);
     Route::get('/security-logs/stats', [AdminSecurityLogController::class, 'stats']);
     Route::get('/security-logs/download', [AdminSecurityLogController::class, 'download']);
     Route::post('/security-logs/clear', [AdminSecurityLogController::class, 'clear']);
     Route::delete('/security-logs/{incidentId}', [AdminSecurityLogController::class, 'destroy']);
     Route::post('/security-logs/test-alert', [AdminSecurityLogController::class, 'testAlert']);
+
+    // Sub-Admin & Role Permissions Management (Super Admin)
+    Route::prefix('sub-admins')->group(function () {
+        Route::get('/', [AdminSubAdminController::class, 'index']);
+        Route::get('/modules', [AdminSubAdminController::class, 'modulesList']);
+        Route::post('/', [AdminSubAdminController::class, 'store']);
+        Route::get('/{id}', [AdminSubAdminController::class, 'show']);
+        Route::put('/{id}', [AdminSubAdminController::class, 'update']);
+        Route::delete('/{id}', [AdminSubAdminController::class, 'destroy']);
+        Route::patch('/{id}/toggle-status', [AdminSubAdminController::class, 'toggleStatus']);
+        Route::post('/{id}/reset-password', [AdminSubAdminController::class, 'resetPassword']);
+    });
+
+    // Cache & Performance Management (Super Admin & Admins)
+    Route::get('/cache/status', [AdminCacheController::class, 'status']);
+    Route::post('/cache/clear', [AdminCacheController::class, 'clear']);
 });

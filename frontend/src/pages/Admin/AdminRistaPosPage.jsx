@@ -87,7 +87,7 @@ const AdminRistaPosPage = () => {
 
     return `curl -X POST "${url}" \\
   -H "x-api-key: ${key}" \\
-  -H "x-api-secret: ${secret}" \\
+  -H "x-api-token: [DYNAMIC_HS256_JWT_TOKEN]" \\
   -H "Accept: application/json" \\
   -H "Content-Type: application/json" \\
   -d '${JSON.stringify(payload, null, 2).replace(/'/g, "'\\''")}'`;
@@ -102,6 +102,25 @@ const AdminRistaPosPage = () => {
   const [editingOutletId, setEditingOutletId] = useState(null);
   const [editStoreIdValue, setEditStoreIdValue] = useState('');
   const [savingOutletId, setSavingOutletId] = useState(null);
+  const [syncingOutlets, setSyncingOutlets] = useState(false);
+
+  const handleSyncOutlets = async () => {
+    setSyncingOutlets(true);
+    try {
+      const res = await api.post('/admin/rista-pos/outlets/sync');
+      if (res.data?.success) {
+        showToast(res.data.message || 'Outlets synced from Rista successfully!', 'success');
+        await fetchOutlets();
+        await fetchConfigAndStats();
+      } else {
+        showToast(res.data?.message || 'Could not sync outlets from Rista', 'info');
+      }
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Sync failed. Please verify Rista credentials.', 'error');
+    } finally {
+      setSyncingOutlets(false);
+    }
+  };
 
   const handleStartEditOutlet = (outlet) => {
     setEditingOutletId(outlet.id);
@@ -380,9 +399,22 @@ const AdminRistaPosPage = () => {
                 Every physical bakery outlet maps to its dedicated DotPe / Rista Store ID for automated KOT printing.
               </p>
             </div>
-            <div className="text-xs font-semibold text-slate-700 bg-white border border-cream-200 px-3 py-1.5 rounded-xl shadow-2xs flex items-center gap-2 self-start sm:self-auto">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span>{outlets.filter((o) => o.rista_pos_enabled).length} of {outlets.length} Outlets POS Active</span>
+            <div className="flex items-center gap-2.5 self-start sm:self-auto flex-wrap">
+              <button
+                type="button"
+                onClick={handleSyncOutlets}
+                disabled={syncingOutlets}
+                className="text-xs font-bold text-white bg-chocolate hover:bg-amber-950 px-3.5 py-1.5 rounded-xl shadow-xs flex items-center gap-1.5 transition-all disabled:opacity-50 cursor-pointer"
+                title="Fetch and sync registered stores from Rista POS API"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${syncingOutlets ? 'animate-spin' : ''}`} />
+                <span>{syncingOutlets ? 'Syncing...' : 'Sync Outlets from Rista'}</span>
+              </button>
+
+              <div className="text-xs font-semibold text-slate-700 bg-white border border-cream-200 px-3 py-1.5 rounded-xl shadow-2xs flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>{outlets.filter((o) => o.rista_pos_enabled).length} of {outlets.length} Outlets POS Active</span>
+              </div>
             </div>
           </div>
 

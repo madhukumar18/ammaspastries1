@@ -16,6 +16,7 @@ import CuratedListPage from './pages/Catalog/CuratedListPage';
 import SearchResultsPage from './pages/Catalog/SearchResultsPage';
 import ProductDetailPage from './pages/Product/ProductDetailPage';
 import PhotoCakePage from './pages/PhotoCake/PhotoCakePage';
+import ThemeCakePage from './pages/ThemeCake/ThemeCakePage';
 import CartPage from './pages/Cart/CartPage';
 import CheckoutPage from './pages/Checkout/CheckoutPage';
 import OrderConfirmationPage from './pages/OrderConfirmation/OrderConfirmationPage';
@@ -44,10 +45,48 @@ import AdminBulkProductsPage from './pages/Admin/AdminBulkProductsPage';
 import AdminEnquiriesPage from './pages/Admin/AdminEnquiriesPage';
 import AdminSettingsPage from './pages/Admin/AdminSettingsPage';
 import AdminPhotoCakePage from './pages/Admin/AdminPhotoCakePage';
+import AdminThemeCakePage from './pages/Admin/AdminThemeCakePage';
 import AdminRistaPosPage from './pages/Admin/AdminRistaPosPage';
 import AdminSecurityLogsPage from './pages/Admin/AdminSecurityLogsPage';
 import AdminCategoryImagesPage from './pages/Admin/AdminCategoryImagesPage';
+import AdminSubAdminsPage from './pages/Admin/AdminSubAdminsPage';
 import ErrorBoundary from './components/UI/ErrorBoundary';
+import { useApp } from './context/AppContext';
+
+// Route Guard to enforce module-level visibility on direct navigation
+const AdminRouteGuard = ({ module, superOnly = false, children }) => {
+  const { isSuperAdmin, hasPermission } = useApp();
+
+  if (superOnly && !isSuperAdmin) {
+    return (
+      <div className="p-8 max-w-xl mx-auto my-12 bg-white rounded-3xl border border-rose-100 shadow-sm text-center space-y-4">
+        <div className="w-14 h-14 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center mx-auto text-2xl font-bold">
+          🔒
+        </div>
+        <h2 className="font-serif text-xl font-bold text-slate-800">Super Administrator Access Required</h2>
+        <p className="text-xs sm:text-sm text-slate-500 leading-relaxed">
+          This area is restricted exclusively to the Super Administrator. You do not have permission to access this management console.
+        </p>
+      </div>
+    );
+  }
+
+  if (module && !hasPermission(module)) {
+    return (
+      <div className="p-8 max-w-xl mx-auto my-12 bg-white rounded-3xl border border-amber-100 shadow-sm text-center space-y-4">
+        <div className="w-14 h-14 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mx-auto text-2xl font-bold">
+          ⚠️
+        </div>
+        <h2 className="font-serif text-xl font-bold text-slate-800">Module Permission Required</h2>
+        <p className="text-xs sm:text-sm text-slate-500 leading-relaxed">
+          You do not have administrative permission to view the <strong className="text-amber-800 capitalize">{module.replace(/_/g, ' ')}</strong> module. Please contact your Super Administrator to request access.
+        </p>
+      </div>
+    );
+  }
+
+  return children;
+};
 
 function App() {
   return (
@@ -62,6 +101,8 @@ function App() {
           {/* Public Storefront Routes */}
           <Route element={<PublicLayout />}>
             <Route path="/" element={<HomePage />} />
+            <Route path="/category/theme-cakes" element={<ThemeCakePage />} />
+            <Route path="/theme-cakes" element={<ThemeCakePage />} />
             <Route path="/category/:slug" element={<CategoryPage />} />
             <Route path="/cakes/:slug" element={<ProductDetailPage />} />
             <Route path="/product/:slug" element={<ProductDetailPage />} />
@@ -102,24 +143,26 @@ function App() {
           {/* Protected Admin Backoffice Routes */}
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<Navigate to="/admin/dashboard" replace />} />
-            <Route path="dashboard" element={<AdminDashboardPage />} />
-            <Route path="products" element={<AdminProductsPage />} />
-            <Route path="photo-cakes" element={<AdminPhotoCakePage />} />
-            <Route path="categories" element={<AdminCategoriesPage />} />
-            <Route path="category-images" element={<AdminCategoryImagesPage />} />
-            <Route path="outlets" element={<AdminOutletsPage />} />
-            <Route path="orders" element={<AdminOrdersPage />} />
-            <Route path="rista-pos" element={<AdminRistaPosPage />} />
-            <Route path="security-logs" element={<AdminSecurityLogsPage />} />
-            <Route path="banners" element={<AdminBannersPage />} />
-            <Route path="gifting" element={<AdminGiftingPage />} />
-            <Route path="reviews" element={<AdminReviewsPage />} />
-            <Route path="bulk-products" element={<AdminBulkProductsPage />} />
-            <Route path="bulk-products-csv" element={<AdminBulkProductsPage />} />
-            <Route path="bulk-imports" element={<AdminBulkImportsPage />} />
-            <Route path="franchise-enquiries" element={<AdminEnquiriesPage />} />
-            <Route path="contact-enquiries" element={<AdminEnquiriesPage />} />
-            <Route path="settings" element={<AdminSettingsPage />} />
+            <Route path="dashboard" element={<AdminRouteGuard module="dashboard"><AdminDashboardPage /></AdminRouteGuard>} />
+            <Route path="products" element={<AdminRouteGuard module="products"><AdminProductsPage /></AdminRouteGuard>} />
+            <Route path="photo-cakes" element={<AdminRouteGuard module="photo_cakes"><AdminPhotoCakePage /></AdminRouteGuard>} />
+            <Route path="theme-cakes" element={<AdminRouteGuard module="theme_cakes"><AdminThemeCakePage /></AdminRouteGuard>} />
+            <Route path="categories" element={<AdminRouteGuard module="categories"><AdminCategoriesPage /></AdminRouteGuard>} />
+            <Route path="category-images" element={<AdminRouteGuard module="categories"><AdminCategoryImagesPage /></AdminRouteGuard>} />
+            <Route path="outlets" element={<AdminRouteGuard module="outlets"><AdminOutletsPage /></AdminRouteGuard>} />
+            <Route path="orders" element={<AdminRouteGuard module="orders"><AdminOrdersPage /></AdminRouteGuard>} />
+            <Route path="rista-pos" element={<AdminRouteGuard module="rista_pos"><AdminRistaPosPage /></AdminRouteGuard>} />
+            <Route path="security-logs" element={<AdminRouteGuard superOnly module="security_logs"><AdminSecurityLogsPage /></AdminRouteGuard>} />
+            <Route path="banners" element={<AdminRouteGuard module="banners"><AdminBannersPage /></AdminRouteGuard>} />
+            <Route path="gifting" element={<AdminRouteGuard module="gifting"><AdminGiftingPage /></AdminRouteGuard>} />
+            <Route path="reviews" element={<AdminRouteGuard module="reviews"><AdminReviewsPage /></AdminRouteGuard>} />
+            <Route path="bulk-products" element={<AdminRouteGuard module="bulk_products"><AdminBulkProductsPage /></AdminRouteGuard>} />
+            <Route path="bulk-products-csv" element={<AdminRouteGuard module="bulk_products"><AdminBulkProductsPage /></AdminRouteGuard>} />
+            <Route path="bulk-imports" element={<AdminRouteGuard module="bulk_orders"><AdminBulkImportsPage /></AdminRouteGuard>} />
+            <Route path="franchise-enquiries" element={<AdminRouteGuard module="franchise_enquiries"><AdminEnquiriesPage /></AdminRouteGuard>} />
+            <Route path="contact-enquiries" element={<AdminRouteGuard module="contact_enquiries"><AdminEnquiriesPage /></AdminRouteGuard>} />
+            <Route path="sub-admins" element={<AdminRouteGuard superOnly module="sub_admins"><AdminSubAdminsPage /></AdminRouteGuard>} />
+            <Route path="settings" element={<AdminRouteGuard superOnly module="settings"><AdminSettingsPage /></AdminRouteGuard>} />
           </Route>
 
           {/* Fallback 404 -> Redirect to Home */}

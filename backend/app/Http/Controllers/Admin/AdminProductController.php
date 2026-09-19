@@ -76,6 +76,15 @@ class AdminProductController extends Controller
             'is_new_arrival' => 'boolean',
             'is_gifting' => 'boolean',
             'image_url' => 'nullable|string',
+            'egg_price' => 'nullable|numeric|min:0',
+            'eggless_price' => 'nullable|numeric|min:0',
+            'flavours' => 'nullable|array',
+            'flavours.*.name' => 'nullable|string',
+            'flavours.*.egg_price' => 'nullable|numeric|min:0',
+            'flavours.*.eggless_price' => 'nullable|numeric|min:0',
+            'flavours.*.is_available' => 'nullable|boolean',
+            'cupcake_variants' => 'nullable|array',
+            'snack_variants' => 'nullable|array',
             'variants' => 'nullable|array',
             'variants.*.size_weight' => 'required|string',
             'variants.*.price' => 'required|numeric|min:0',
@@ -89,6 +98,64 @@ class AdminProductController extends Controller
             $slug .= '-' . ($count + 1);
         }
         $validated['slug'] = $slug;
+
+        // Sync snack_variants into base columns if present
+        if (!empty($validated['snack_variants']) && is_array($validated['snack_variants'])) {
+            $sv = $validated['snack_variants'];
+            $pricingType = $sv['pricing_type'] ?? 'piece';
+            if ($pricingType === 'piece' && !empty($sv['piece'])) {
+                $validated['portion_type'] = 'portion';
+                $validated['portion_unit'] = 'pieces';
+                if (isset($sv['piece']['eggless_price']) && $sv['piece']['eggless_price'] !== '') {
+                    $validated['eggless_price'] = (float) $sv['piece']['eggless_price'];
+                    $validated['base_price'] = (float) $sv['piece']['eggless_price'];
+                    $validated['piece_price'] = (float) $sv['piece']['eggless_price'];
+                }
+                if (isset($sv['piece']['egg_price']) && $sv['piece']['egg_price'] !== '') {
+                    $validated['egg_price'] = (float) $sv['piece']['egg_price'];
+                    if (empty($validated['base_price'])) {
+                        $validated['base_price'] = (float) $sv['piece']['egg_price'];
+                        $validated['piece_price'] = (float) $sv['piece']['egg_price'];
+                    }
+                }
+            } elseif ($pricingType === 'weight' && !empty($sv['weight'])) {
+                $validated['portion_type'] = 'weight';
+                $validated['portion_unit'] = $sv['weight']['unit'] ?? 'grams';
+                $validated['weight'] = $sv['weight']['value'] ?? '500g';
+                if (isset($sv['weight']['eggless_price']) && $sv['weight']['eggless_price'] !== '') {
+                    $validated['eggless_price'] = (float) $sv['weight']['eggless_price'];
+                    $validated['base_price'] = (float) $sv['weight']['eggless_price'];
+                }
+                if (isset($sv['weight']['egg_price']) && $sv['weight']['egg_price'] !== '') {
+                    $validated['egg_price'] = (float) $sv['weight']['egg_price'];
+                    if (empty($validated['base_price'])) {
+                        $validated['base_price'] = (float) $sv['weight']['egg_price'];
+                    }
+                }
+            } elseif ($pricingType === 'both') {
+                $validated['portion_type'] = 'both';
+                if (!empty($sv['weight'])) {
+                    $validated['portion_unit'] = $sv['weight']['unit'] ?? 'grams';
+                    $validated['weight'] = $sv['weight']['value'] ?? '500g';
+                    if (isset($sv['weight']['eggless_price']) && $sv['weight']['eggless_price'] !== '') {
+                        $validated['eggless_price'] = (float) $sv['weight']['eggless_price'];
+                    }
+                    if (isset($sv['weight']['egg_price']) && $sv['weight']['egg_price'] !== '') {
+                        $validated['egg_price'] = (float) $sv['weight']['egg_price'];
+                    }
+                }
+                if (!empty($sv['piece'])) {
+                    $piecePrice = $sv['piece']['eggless_price'] ?? $sv['piece']['egg_price'] ?? null;
+                    if ($piecePrice !== null) {
+                        $validated['piece_price'] = (float) $piecePrice;
+                    }
+                }
+                $base = $validated['piece_price'] ?? $validated['eggless_price'] ?? $validated['egg_price'] ?? null;
+                if ($base !== null) {
+                    $validated['base_price'] = (float) $base;
+                }
+            }
+        }
 
         $variants = $validated['variants'] ?? [];
         unset($validated['variants']);
@@ -118,6 +185,8 @@ class AdminProductController extends Controller
                 ]);
             }
         }
+
+        app(\App\Services\CacheManagerService::class)->clearCatalog();
 
         return response()->json([
             'success' => true,
@@ -160,8 +229,75 @@ class AdminProductController extends Controller
             'is_new_arrival' => 'boolean',
             'is_gifting' => 'boolean',
             'image_url' => 'nullable|string',
+            'egg_price' => 'nullable|numeric|min:0',
+            'eggless_price' => 'nullable|numeric|min:0',
+            'flavours' => 'nullable|array',
+            'flavours.*.name' => 'nullable|string',
+            'flavours.*.egg_price' => 'nullable|numeric|min:0',
+            'flavours.*.eggless_price' => 'nullable|numeric|min:0',
+            'flavours.*.is_available' => 'nullable|boolean',
+            'cupcake_variants' => 'nullable|array',
+            'snack_variants' => 'nullable|array',
             'variants' => 'nullable|array',
         ]);
+
+        // Sync snack_variants into base columns if present
+        if (!empty($validated['snack_variants']) && is_array($validated['snack_variants'])) {
+            $sv = $validated['snack_variants'];
+            $pricingType = $sv['pricing_type'] ?? 'piece';
+            if ($pricingType === 'piece' && !empty($sv['piece'])) {
+                $validated['portion_type'] = 'portion';
+                $validated['portion_unit'] = 'pieces';
+                if (isset($sv['piece']['eggless_price']) && $sv['piece']['eggless_price'] !== '') {
+                    $validated['eggless_price'] = (float) $sv['piece']['eggless_price'];
+                    $validated['base_price'] = (float) $sv['piece']['eggless_price'];
+                    $validated['piece_price'] = (float) $sv['piece']['eggless_price'];
+                }
+                if (isset($sv['piece']['egg_price']) && $sv['piece']['egg_price'] !== '') {
+                    $validated['egg_price'] = (float) $sv['piece']['egg_price'];
+                    if (empty($validated['base_price'])) {
+                        $validated['base_price'] = (float) $sv['piece']['egg_price'];
+                        $validated['piece_price'] = (float) $sv['piece']['egg_price'];
+                    }
+                }
+            } elseif ($pricingType === 'weight' && !empty($sv['weight'])) {
+                $validated['portion_type'] = 'weight';
+                $validated['portion_unit'] = $sv['weight']['unit'] ?? 'grams';
+                $validated['weight'] = $sv['weight']['value'] ?? '500g';
+                if (isset($sv['weight']['eggless_price']) && $sv['weight']['eggless_price'] !== '') {
+                    $validated['eggless_price'] = (float) $sv['weight']['eggless_price'];
+                    $validated['base_price'] = (float) $sv['weight']['eggless_price'];
+                }
+                if (isset($sv['weight']['egg_price']) && $sv['weight']['egg_price'] !== '') {
+                    $validated['egg_price'] = (float) $sv['weight']['egg_price'];
+                    if (empty($validated['base_price'])) {
+                        $validated['base_price'] = (float) $sv['weight']['egg_price'];
+                    }
+                }
+            } elseif ($pricingType === 'both') {
+                $validated['portion_type'] = 'both';
+                if (!empty($sv['weight'])) {
+                    $validated['portion_unit'] = $sv['weight']['unit'] ?? 'grams';
+                    $validated['weight'] = $sv['weight']['value'] ?? '500g';
+                    if (isset($sv['weight']['eggless_price']) && $sv['weight']['eggless_price'] !== '') {
+                        $validated['eggless_price'] = (float) $sv['weight']['eggless_price'];
+                    }
+                    if (isset($sv['weight']['egg_price']) && $sv['weight']['egg_price'] !== '') {
+                        $validated['egg_price'] = (float) $sv['weight']['egg_price'];
+                    }
+                }
+                if (!empty($sv['piece'])) {
+                    $piecePrice = $sv['piece']['eggless_price'] ?? $sv['piece']['egg_price'] ?? null;
+                    if ($piecePrice !== null) {
+                        $validated['piece_price'] = (float) $piecePrice;
+                    }
+                }
+                $base = $validated['piece_price'] ?? $validated['eggless_price'] ?? $validated['egg_price'] ?? null;
+                if ($base !== null) {
+                    $validated['base_price'] = (float) $base;
+                }
+            }
+        }
 
         $variants = $validated['variants'] ?? null;
         unset($validated['variants']);
@@ -185,6 +321,8 @@ class AdminProductController extends Controller
             }
         }
 
+        app(\App\Services\CacheManagerService::class)->clearCatalog();
+
         return response()->json([
             'success' => true,
             'message' => 'Product updated successfully!',
@@ -196,6 +334,8 @@ class AdminProductController extends Controller
     {
         $product = Product::findOrFail($id);
         $product->delete();
+
+        app(\App\Services\CacheManagerService::class)->clearCatalog();
 
         return response()->json([
             'success' => true,
@@ -215,6 +355,8 @@ class AdminProductController extends Controller
 
         $product->{$field} = !$product->{$field};
         $product->save();
+
+        app(\App\Services\CacheManagerService::class)->clearCatalog();
 
         return response()->json([
             'success' => true,

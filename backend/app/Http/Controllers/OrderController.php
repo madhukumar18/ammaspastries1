@@ -33,7 +33,7 @@ class OrderController extends Controller
             'coupon_code' => 'nullable|string',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
-            'items.*.variant_id' => 'nullable|exists:product_variants,id',
+            'items.*.variant_id' => 'nullable',
             'items.*.quantity' => 'required|integer|min:1|max:50',
             'items.*.customization' => 'nullable|array',
         ], [
@@ -51,16 +51,35 @@ class OrderController extends Controller
                 $product = Product::findOrFail($itemInput['product_id']);
                 $unitPrice = $product->discount_price ?: $product->base_price;
                 $variantTitle = null;
+                $dbVariantId = null;
 
-                if (!empty($itemInput['variant_id'])) {
+                $rawVariantId = $itemInput['variant_id'] ?? null;
+                if (!empty($rawVariantId) && is_numeric($rawVariantId)) {
                     $variant = ProductVariant::where('product_id', $product->id)
-                        ->where('id', $itemInput['variant_id'])
-                        ->firstOrFail();
-                    $unitPrice = $variant->discount_price ?: $variant->price;
-                    $variantTitle = $variant->size_weight;
-                } elseif (!empty($itemInput['customization']['unit_price']) && $product->id >= 9900) {
-                    $unitPrice = max(1, (float) $itemInput['customization']['unit_price']);
-                    $variantTitle = $itemInput['customization']['size'] ?? $itemInput['customization']['shape'] ?? null;
+                        ->where('id', (int) $rawVariantId)
+                        ->first();
+                    if ($variant) {
+                        $dbVariantId = $variant->id;
+                        $unitPrice = $variant->discount_price ?: $variant->price;
+                        $variantTitle = $variant->size_weight;
+                    }
+                }
+
+                // If not matched to a DB variant, check customization for customized price & title (e.g. weights 1kg/2kg, snacks, cupcakes, photo cakes)
+                if (!$dbVariantId) {
+                    if (!empty($itemInput['customization']['unit_price'])) {
+                        $unitPrice = max(1, (float) $itemInput['customization']['unit_price']);
+                    } elseif (!empty($itemInput['customization']['selected_price'])) {
+                        $unitPrice = max(1, (float) $itemInput['customization']['selected_price']);
+                    }
+
+                    $variantTitle = $itemInput['customization']['selected_weight_portion']
+                        ?? $itemInput['customization']['portion_label']
+                        ?? $itemInput['customization']['size']
+                        ?? $itemInput['customization']['shape']
+                        ?? $itemInput['customization']['flavour']
+                        ?? $product->weight
+                        ?? null;
                 }
 
                 $qty = (int) $itemInput['quantity'];
@@ -69,7 +88,7 @@ class OrderController extends Controller
 
                 $orderItemsData[] = [
                     'product_id' => $product->id,
-                    'variant_id' => $itemInput['variant_id'] ?? null,
+                    'variant_id' => $dbVariantId,
                     'product_name' => $product->name,
                     'variant_title' => $variantTitle,
                     'unit_price' => $unitPrice,

@@ -10,7 +10,7 @@ class AdminOrderController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Order::with(['outlet', 'items.customization.photoUpload', 'latestPayment']);
+        $query = Order::with(['outlet', 'items.customization.photoUpload', 'latestPayment', 'payments']);
 
         // Search by order number, phone, customer name
         if ($request->filled('search')) {
@@ -63,6 +63,7 @@ class AdminOrderController extends Controller
             'outlet',
             'items.product',
             'items.customization.photoUpload',
+            'latestPayment',
             'payments'
         ])->findOrFail($id);
 

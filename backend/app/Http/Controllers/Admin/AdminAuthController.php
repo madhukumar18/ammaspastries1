@@ -86,22 +86,6 @@ class AdminAuthController extends Controller
 
         $email = strtolower(trim($validated['email']));
 
-        // Restrict admin portal login exclusively to mkumar200418@gmail.com
-        if ($email !== self::AUTHORIZED_ADMIN_EMAIL) {
-            \App\Services\SecurityLoggerService::logThreat(
-                type: 'UNAUTHORIZED_ADMIN_LOGIN_ATTEMPT',
-                severity: 'HIGH',
-                message: "Unauthorized email attempted admin login: '{$email}'",
-                request: $request,
-                context: ['attempted_email' => $email]
-            );
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Access denied: Invalid administrative credentials.',
-            ], 403);
-        }
-
         $admin = Admin::where('email', $email)->first();
 
         if (!$admin || !Hash::check($validated['password'], $admin->password)) {
@@ -130,7 +114,7 @@ class AdminAuthController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Your administrator account has been deactivated.',
+                'message' => 'Your administrator account has been deactivated. Please contact your Super Administrator.',
             ], 403);
         }
 
@@ -144,7 +128,10 @@ class AdminAuthController extends Controller
                     'id' => $admin->id,
                     'name' => $admin->name,
                     'email' => $admin->email,
+                    'phone' => $admin->phone,
                     'role' => $admin->role,
+                    'is_super_admin' => $admin->isSuperAdmin(),
+                    'permissions' => $admin->isSuperAdmin() ? ['*'] : ($admin->permissions ?? []),
                 ],
                 'token' => $token,
             ]
@@ -157,7 +144,15 @@ class AdminAuthController extends Controller
         return response()->json([
             'success' => true,
             'data' => [
-                'admin' => $admin,
+                'admin' => [
+                    'id' => $admin->id,
+                    'name' => $admin->name,
+                    'email' => $admin->email,
+                    'phone' => $admin->phone,
+                    'role' => $admin->role,
+                    'is_super_admin' => $admin->isSuperAdmin(),
+                    'permissions' => $admin->isSuperAdmin() ? ['*'] : ($admin->permissions ?? []),
+                ],
             ]
         ]);
     }

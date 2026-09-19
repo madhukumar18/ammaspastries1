@@ -34,6 +34,12 @@ class Product extends Model
         'is_new_arrival',
         'is_gifting',
         'image_url',
+        'egg_price',
+        'eggless_price',
+        'shapes',
+        'flavours',
+        'cupcake_variants',
+        'snack_variants',
     ];
 
     protected function casts(): array
@@ -41,6 +47,8 @@ class Product extends Model
         return [
             'base_price' => 'float',
             'discount_price' => 'float',
+            'egg_price' => 'float',
+            'eggless_price' => 'float',
             'piece_price' => 'float',
             'piece_limit' => 'integer',
             'piece_min' => 'integer',
@@ -51,6 +59,9 @@ class Product extends Model
             'is_new_arrival' => 'boolean',
             'is_gifting' => 'boolean',
             'stock' => 'integer',
+            'flavours' => 'array',
+            'cupcake_variants' => 'array',
+            'snack_variants' => 'array',
         ];
     }
 

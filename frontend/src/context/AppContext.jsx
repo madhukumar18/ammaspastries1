@@ -240,7 +240,7 @@ export const AppProvider = ({ children }) => {
         (item) => item.product.id === product.id && item.variant?.id === variantId && (item.customKey || '') === customKey
       );
 
-      const price = variant?.discount_price || variant?.price || product.discount_price || product.base_price || product.price || 0;
+      const price = customization?.selected_price || variant?.discount_price || variant?.price || product.discount_price || product.base_price || product.price || 0;
 
       if (existingIndex > -1) {
         const updated = [...prev];
@@ -352,6 +352,22 @@ export const AppProvider = ({ children }) => {
     showToast('Logged out from Admin Dashboard', 'info');
   };
 
+  // Admin Permissions Helper
+  const isSuperAdmin = admin?.role === 'super_admin' || admin?.email === 'mkumar200418@gmail.com' || admin?.is_super_admin === true;
+
+  const hasPermission = (moduleKey) => {
+    if (!admin) return false;
+    if (isSuperAdmin) return true;
+    const permissions = Array.isArray(admin.permissions) ? admin.permissions : [];
+    if (permissions.includes('*')) return true;
+    const keys = String(moduleKey).split(/[|,]/).map((k) => k.trim());
+    return keys.some(
+      (k) =>
+        permissions.includes(k) ||
+        (k === 'theme_cakes' && (permissions.includes('products') || permissions.includes('categories')))
+    );
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -379,6 +395,8 @@ export const AppProvider = ({ children }) => {
         adminToken,
         loginAdmin,
         logoutAdmin,
+        isSuperAdmin,
+        hasPermission,
         userLocation,
         setUserLocation,
         userDistance,
