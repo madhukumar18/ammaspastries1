@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import { useApp } from '../../context/AppContext';
+import { formatImageUrl } from '../../utils/imageUrl';
 import {
   Plus,
   Search,
@@ -121,6 +122,14 @@ const AdminProductsPage = () => {
     cupcake_variants: defaultCupcakeVariants,
     enable_snack_matrix: false,
     snack_variants: defaultSnackVariants,
+    theme_cake_default_weight: '5',
+    theme_cake_default_price: '2000',
+    theme_cake_step_size: '1',
+    theme_cake_price_tiers: [],
+    dessert_min_quantity: '2',
+    dessert_default_price: '100',
+    dessert_step_size: 1,
+    dessert_price_tiers: [],
   });
 
   const [dietFilter, setDietFilter] = useState(''); // '', 'true', 'false'
@@ -211,6 +220,21 @@ const AdminProductsPage = () => {
   // Compute available subcategories for currently selected category in modal
   const selectedCategoryObj = categories.find((c) => String(c.id) === String(formData.category_id));
   const availableSubcategories = selectedCategoryObj?.subcategories || [];
+  const isThemeCakeSelected = Boolean(
+    selectedCategoryObj?.slug === 'theme-cakes' ||
+    selectedCategoryObj?.name?.toLowerCase().includes('theme cake') ||
+    String(formData.category_id) === '8'
+  );
+  const isDessertSelected = Boolean(
+    selectedCategoryObj?.slug === 'dessert' ||
+    selectedCategoryObj?.name?.toLowerCase().includes('dessert') ||
+    String(formData.category_id) === '3'
+  );
+  const isDryFruitSelected = Boolean(
+    selectedCategoryObj?.slug === 'dry-fruits' ||
+    selectedCategoryObj?.name?.toLowerCase().includes('dry fruit') ||
+    String(formData.category_id) === '4'
+  );
 
   // Compute available subcategories for category filter
   const filterCategoryObj = categories.find((c) => String(c.id) === String(selectedCat));
@@ -256,6 +280,15 @@ const AdminProductsPage = () => {
       cupcake_variants: defaultCupcakeVariants,
       enable_snack_matrix: defaultCat?.slug === 'snacks' || defaultCat?.name?.toLowerCase() === 'snacks',
       snack_variants: defaultSnackVariants,
+      theme_cake_default_weight: '5',
+      theme_cake_default_price: '2000',
+      theme_cake_step_size: '1',
+      theme_cake_price_tiers: [],
+      dessert_min_quantity: '2',
+      dessert_default_price: '100',
+      dessert_step_size: 1,
+      dessert_price_tiers: [],
+      dry_fruit_pack_options: [],
     });
     setNewCreamInput('');
     setNewEggInput('');
@@ -280,6 +313,68 @@ const AdminProductsPage = () => {
       categories.find((c) => String(c.id) === String(product.category_id))?.slug === 'snacks' ||
       Boolean(product.snack_variants?.pricing_type)
     );
+    const isThemeProduct = Boolean(
+      product.category?.slug === 'theme-cakes' ||
+      product.category?.name?.toLowerCase().includes('theme cake') ||
+      categories.find((c) => String(c.id) === String(product.category_id))?.slug === 'theme-cakes' ||
+      String(product.category_id) === '8' ||
+      (product.theme_cake_default_weight && Number(product.theme_cake_default_weight) > 0)
+    );
+    const isDessertProduct = Boolean(
+      product.category?.slug === 'dessert' ||
+      product.category?.name?.toLowerCase().includes('dessert') ||
+      categories.find((c) => String(c.id) === String(product.category_id))?.slug === 'dessert' ||
+      String(product.category_id) === '3' ||
+      (product.dessert_min_quantity && Number(product.dessert_min_quantity) > 0)
+    );
+    const isDryFruitProduct = Boolean(
+      product.category?.slug === 'dry-fruits' ||
+      product.category?.name?.toLowerCase().includes('dry fruit') ||
+      categories.find((c) => String(c.id) === String(product.category_id))?.slug === 'dry-fruits' ||
+      String(product.category_id) === '4' ||
+      (Array.isArray(product.dry_fruit_pack_options) && product.dry_fruit_pack_options.length > 0)
+    );
+
+    let parsedTiers = [];
+    if (Array.isArray(product.theme_cake_price_tiers)) {
+      parsedTiers = product.theme_cake_price_tiers;
+    } else if (typeof product.theme_cake_price_tiers === 'string') {
+      try {
+        parsedTiers = JSON.parse(product.theme_cake_price_tiers);
+      } catch (e) {
+        parsedTiers = [];
+      }
+    }
+
+    let parsedDessertTiers = [];
+    if (Array.isArray(product.dessert_price_tiers)) {
+      parsedDessertTiers = product.dessert_price_tiers;
+    } else if (typeof product.dessert_price_tiers === 'string') {
+      try {
+        parsedDessertTiers = JSON.parse(product.dessert_price_tiers);
+      } catch (e) {
+        parsedDessertTiers = [];
+      }
+    }
+
+    let parsedDryFruitPacks = [];
+    if (Array.isArray(product.dry_fruit_pack_options)) {
+      parsedDryFruitPacks = product.dry_fruit_pack_options;
+    } else if (typeof product.dry_fruit_pack_options === 'string') {
+      try {
+        parsedDryFruitPacks = JSON.parse(product.dry_fruit_pack_options);
+      } catch (e) {
+        parsedDryFruitPacks = [];
+      }
+    }
+    if (isDryFruitProduct && parsedDryFruitPacks.length === 0) {
+      const match = String(product.weight || '').match(/^(\d+(?:\.\d+)?)\s*(g|kg)?$/i);
+      const w = match ? Number(match[1]) : 200;
+      const u = match && match[2] ? match[2].toLowerCase() : (w <= 10 ? 'kg' : 'g');
+      parsedDryFruitPacks = [
+        { weight: w, unit: u, label: `${w}${u}`, price: Number(product.base_price || 150) }
+      ];
+    }
 
     setFormData({
       name: product.name,
@@ -288,10 +383,14 @@ const AdminProductsPage = () => {
       subcategory_id: product.subcategory_id || '',
       base_price: product.base_price,
       discount_price: product.discount_price || '',
-      weight: product.weight || '500g',
-      portion_type: product.portion_type || (product.weight && ((product.weight.toLowerCase().includes('piece') || product.weight.toLowerCase().includes('slice') || product.weight.toLowerCase().includes('portion') || product.weight.toLowerCase().includes('pcs')) && (product.weight.toLowerCase().includes('g') || product.weight.toLowerCase().includes('kg'))) ? 'both' : (product.weight && (product.weight.toLowerCase().includes('piece') || product.weight.toLowerCase().includes('slice') || product.weight.toLowerCase().includes('portion'))) ? 'portion' : 'weight'),
-      portion_unit: product.portion_unit || 'grams',
-      portion_step: product.portion_step || '500g',
+      weight: isDessertProduct
+        ? `${product.dessert_min_quantity || 2} Pcs`
+        : (product.weight || '500g'),
+      portion_type: isDessertProduct
+        ? 'portion'
+        : (product.portion_type || (product.weight && ((product.weight.toLowerCase().includes('piece') || product.weight.toLowerCase().includes('slice') || product.weight.toLowerCase().includes('portion') || product.weight.toLowerCase().includes('pcs')) && (product.weight.toLowerCase().includes('g') || product.weight.toLowerCase().includes('kg'))) ? 'both' : (product.weight && (product.weight.toLowerCase().includes('piece') || product.weight.toLowerCase().includes('slice') || product.weight.toLowerCase().includes('portion'))) ? 'portion' : 'weight')),
+      portion_unit: isDessertProduct ? 'pieces' : (product.portion_unit || 'grams'),
+      portion_step: isDessertProduct ? '1' : (product.portion_step || '500g'),
       piece_price: product.piece_price ? String(product.piece_price) : '',
       piece_limit: product.piece_limit !== null && product.piece_limit !== undefined ? String(product.piece_limit) : '20',
       piece_min: product.piece_min ? String(product.piece_min) : '1',
@@ -314,6 +413,25 @@ const AdminProductsPage = () => {
       cupcake_variants: product.cupcake_variants || defaultCupcakeVariants,
       enable_snack_matrix: isSnackProduct || Boolean(product.snack_variants),
       snack_variants: product.snack_variants || defaultSnackVariants,
+      theme_cake_default_weight: product.theme_cake_default_weight !== null && product.theme_cake_default_weight !== undefined
+        ? String(product.theme_cake_default_weight)
+        : (isThemeProduct ? '5' : ''),
+      theme_cake_default_price: product.theme_cake_default_price !== null && product.theme_cake_default_price !== undefined
+        ? String(product.theme_cake_default_price)
+        : (isThemeProduct ? String(product.base_price || 2000) : ''),
+      theme_cake_step_size: product.theme_cake_step_size !== null && product.theme_cake_step_size !== undefined
+        ? String(product.theme_cake_step_size)
+        : '1',
+      theme_cake_price_tiers: parsedTiers,
+      dessert_min_quantity: product.dessert_min_quantity !== null && product.dessert_min_quantity !== undefined
+        ? String(product.dessert_min_quantity)
+        : (isDessertProduct ? '2' : '1'),
+      dessert_default_price: product.dessert_default_price !== null && product.dessert_default_price !== undefined
+        ? String(product.dessert_default_price)
+        : (isDessertProduct ? String(product.base_price || 100) : ''),
+      dessert_step_size: 1,
+      dessert_price_tiers: parsedDessertTiers,
+      dry_fruit_pack_options: parsedDryFruitPacks,
     });
     setNewCreamInput('');
     setNewEggInput('');
@@ -482,9 +600,127 @@ const AdminProductsPage = () => {
     }
   };
 
+  const handleAddThemeTier = () => {
+    const currentTiers = formData.theme_cake_price_tiers || [];
+    const defWeight = Number(formData.theme_cake_default_weight || 5);
+    const stepSize = Number(formData.theme_cake_step_size || 1);
+    const nextWeight = currentTiers.length > 0
+      ? Number(currentTiers[currentTiers.length - 1].weight || defWeight) + stepSize
+      : defWeight + stepSize;
+    const defPrice = Number(formData.theme_cake_default_price || formData.base_price || 2000);
+    const estimatedPrice = Math.round((defPrice / defWeight) * nextWeight);
+
+    setFormData((prev) => ({
+      ...prev,
+      theme_cake_price_tiers: [
+        ...(prev.theme_cake_price_tiers || []),
+        { weight: nextWeight, price: estimatedPrice },
+      ],
+    }));
+  };
+
+  const handleUpdateThemeTier = (index, field, value) => {
+    const updated = [...(formData.theme_cake_price_tiers || [])];
+    updated[index] = { ...updated[index], [field]: value };
+    setFormData((prev) => ({ ...prev, theme_cake_price_tiers: updated }));
+  };
+
+  const handleRemoveThemeTier = (index) => {
+    const updated = (formData.theme_cake_price_tiers || []).filter((_, i) => i !== index);
+    setFormData((prev) => ({ ...prev, theme_cake_price_tiers: updated }));
+  };
+
+  const handleAddDessertTier = () => {
+    const currentTiers = formData.dessert_price_tiers || [];
+    const minQty = Math.max(1, parseInt(formData.dessert_min_quantity || 2, 10));
+    const nextQty = currentTiers.length > 0
+      ? parseInt(currentTiers[currentTiers.length - 1].quantity || minQty, 10) + 1
+      : minQty + 1;
+    const defPrice = Number(formData.dessert_default_price || formData.base_price || 100);
+    const estimatedPrice = Math.round((defPrice / minQty) * nextQty);
+
+    setFormData((prev) => ({
+      ...prev,
+      dessert_price_tiers: [
+        ...(prev.dessert_price_tiers || []),
+        { quantity: nextQty, price: estimatedPrice },
+      ],
+    }));
+  };
+
+  const handleUpdateDessertTier = (index, field, value) => {
+    const updated = [...(formData.dessert_price_tiers || [])];
+    updated[index] = { ...updated[index], [field]: value };
+    setFormData((prev) => ({ ...prev, dessert_price_tiers: updated }));
+  };
+
+  const handleRemoveDessertTier = (index) => {
+    const updated = (formData.dessert_price_tiers || []).filter((_, i) => i !== index);
+    setFormData((prev) => ({ ...prev, dessert_price_tiers: updated }));
+  };
+
+  const handleAddDryFruitPack = () => {
+    const currentPacks = formData.dry_fruit_pack_options || [];
+    let nextWeight = 200;
+    let nextUnit = 'g';
+    let nextPrice = 150;
+    if (currentPacks.length > 0) {
+      const last = currentPacks[currentPacks.length - 1];
+      if (last.unit === 'g') {
+        if (Number(last.weight) < 500) {
+          nextWeight = 500;
+          nextUnit = 'g';
+          nextPrice = Math.round(Number(last.price || 150) * 2.2);
+        } else {
+          nextWeight = 1;
+          nextUnit = 'kg';
+          nextPrice = Math.round(Number(last.price || 350) * 1.9);
+        }
+      } else {
+        nextWeight = Number(last.weight) + 1;
+        nextUnit = 'kg';
+        nextPrice = Math.round(Number(last.price || 650) * (nextWeight / Math.max(1, Number(last.weight))));
+      }
+    }
+    setFormData((prev) => ({
+      ...prev,
+      dry_fruit_pack_options: [
+        ...(prev.dry_fruit_pack_options || []),
+        { weight: nextWeight, unit: nextUnit, price: nextPrice },
+      ],
+    }));
+  };
+
+  const handleUpdateDryFruitPack = (index, field, value) => {
+    const updated = [...(formData.dry_fruit_pack_options || [])];
+    updated[index] = { ...updated[index], [field]: value };
+    setFormData((prev) => ({ ...prev, dry_fruit_pack_options: updated }));
+  };
+
+  const handleRemoveDryFruitPack = (index) => {
+    const updated = (formData.dry_fruit_pack_options || []).filter((_, i) => i !== index);
+    setFormData((prev) => ({ ...prev, dry_fruit_pack_options: updated }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      const isTheme = Boolean(
+        selectedCategoryObj?.slug === 'theme-cakes' ||
+        selectedCategoryObj?.name?.toLowerCase().includes('theme cake') ||
+        String(formData.category_id) === '8'
+      );
+      const isDessert = Boolean(
+        selectedCategoryObj?.slug === 'dessert' ||
+        selectedCategoryObj?.name?.toLowerCase().includes('dessert') ||
+        String(formData.category_id) === '3'
+      );
+      const isDryFruit = Boolean(
+        selectedCategoryObj?.slug === 'dry-fruits' ||
+        selectedCategoryObj?.name?.toLowerCase().includes('dry fruit') ||
+        String(formData.category_id) === '4'
+      );
+
       const payload = {
         ...formData,
         piece_price: formData.piece_price ? Number(formData.piece_price) : null,
@@ -492,7 +728,55 @@ const AdminProductsPage = () => {
         piece_min: formData.piece_min ? Number(formData.piece_min) : 1,
         cupcake_variants: formData.enable_cupcake_matrix ? formData.cupcake_variants : null,
         snack_variants: formData.enable_snack_matrix ? formData.snack_variants : null,
+        theme_cake_default_weight: isTheme ? Number(formData.theme_cake_default_weight || 5) : null,
+        theme_cake_default_price: isTheme ? Number(formData.theme_cake_default_price || formData.base_price || 2000) : null,
+        theme_cake_step_size: isTheme ? Number(formData.theme_cake_step_size || 1) : null,
+        theme_cake_price_tiers: isTheme ? (formData.theme_cake_price_tiers || []) : null,
+        dessert_min_quantity: isDessert ? Math.max(1, parseInt(formData.dessert_min_quantity || 1, 10)) : null,
+        dessert_default_price: isDessert ? Number(formData.dessert_default_price || formData.base_price || 100) : null,
+        dessert_step_size: 1,
+        dessert_price_tiers: isDessert ? (formData.dessert_price_tiers || []) : null,
+        dry_fruit_pack_options: isDryFruit ? (formData.dry_fruit_pack_options || []) : null,
       };
+
+      if (isTheme) {
+        payload.base_price = payload.theme_cake_default_price || formData.base_price || 2000;
+        payload.weight = `${payload.theme_cake_default_weight || 5}kg`;
+      }
+      if (isDessert) {
+        payload.base_price = payload.dessert_default_price || formData.base_price || 100;
+        payload.weight = `${payload.dessert_min_quantity || 1} Pcs`;
+        payload.portion_type = 'portion';
+        payload.portion_unit = 'pieces';
+        payload.portion_step = '1';
+      }
+      if (isDryFruit) {
+        const rawPacks = formData.dry_fruit_pack_options || [];
+        const validPacks = rawPacks.filter((p) => Number(p.weight) > 0 && Number(p.price) > 0);
+        if (validPacks.length === 0) {
+          showToast('Please add at least one valid pack option (weight, unit, price) for Dry Fruits.', 'warning');
+          return;
+        }
+        const formattedPacks = validPacks.map((p) => {
+          const unit = String(p.unit || 'g').toLowerCase() === 'kg' ? 'kg' : 'g';
+          const weight = Number(p.weight);
+          return {
+            weight,
+            unit,
+            label: `${weight}${unit}`,
+            price: Number(p.price),
+          };
+        });
+        formattedPacks.sort((a, b) => {
+          const aGrams = a.unit === 'kg' ? a.weight * 1000 : a.weight;
+          const bGrams = b.unit === 'kg' ? b.weight * 1000 : b.weight;
+          return aGrams - bGrams;
+        });
+
+        payload.dry_fruit_pack_options = formattedPacks;
+        payload.base_price = formattedPacks[0].price;
+        payload.weight = formattedPacks[0].label;
+      }
       if (editingId) {
         await api.put(`/admin/products/${editingId}`, payload);
         showToast('Product updated successfully!', 'success');
@@ -870,7 +1154,7 @@ const AdminProductsPage = () => {
                     <td className="p-4">
                       <div className="flex items-center gap-3">
                         <img
-                          src={p.image_url || 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=100'}
+                          src={formatImageUrl(p.image_url, 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=100')}
                           alt={p.name}
                           className="w-12 h-12 rounded-xl object-cover border border-amber-100 flex-shrink-0"
                           onError={(e) => {
@@ -1054,13 +1338,21 @@ const AdminProductsPage = () => {
                       const newCatId = e.target.value;
                       const catObj = categories.find((c) => String(c.id) === String(newCatId));
                       const isSnacks = Boolean(catObj?.slug === 'snacks' || catObj?.name?.toLowerCase() === 'snacks');
+                      const isDry = Boolean(catObj?.slug === 'dry-fruits' || catObj?.name?.toLowerCase().includes('dry fruit') || String(newCatId) === '4');
                       const firstSub = catObj?.subcategories?.[0]?.id || '';
-                      setFormData({
-                        ...formData,
+                      setFormData((prev) => ({
+                        ...prev,
                         category_id: newCatId,
                         subcategory_id: firstSub,
-                        enable_snack_matrix: isSnacks || formData.enable_snack_matrix,
-                      });
+                        enable_snack_matrix: isSnacks || prev.enable_snack_matrix,
+                        dry_fruit_pack_options: isDry && (!prev.dry_fruit_pack_options || prev.dry_fruit_pack_options.length === 0)
+                          ? [
+                              { weight: 200, unit: 'g', price: 150 },
+                              { weight: 500, unit: 'g', price: 350 },
+                              { weight: 1, unit: 'kg', price: 650 },
+                            ]
+                          : prev.dry_fruit_pack_options,
+                      }));
                     }}
                     className="w-full p-2.5 rounded-xl border border-slate-200 font-semibold focus:outline-none focus:border-amber-500"
                   >
@@ -1115,7 +1407,561 @@ const AdminProductsPage = () => {
                   />
                 </div>
 
+                {/* THEME CAKE DYNAMIC BASE WEIGHT & PRICING RULES */}
+                {isThemeCakeSelected && (
+                  <div className="sm:col-span-2 p-4 sm:p-5 bg-gradient-to-br from-amber-50/90 via-orange-50/40 to-amber-100/30 rounded-2xl border-2 border-amber-300 shadow-xs space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-amber-200">
+                      <div className="flex items-center gap-2">
+                        <Scale className="w-5 h-5 text-amber-700 shrink-0" />
+                        <div>
+                          <h3 className="font-serif font-bold text-sm sm:text-base text-chocolate flex items-center gap-2">
+                            <span>Theme Cake Starting Weight &amp; Dynamic Pricing</span>
+                            <span className="text-[10px] font-bold bg-amber-500 text-chocolate px-2 py-0.5 rounded-full uppercase tracking-wider">
+                              Theme Rule
+                            </span>
+                          </h3>
+                          <p className="text-[11px] text-slate-600 mt-0.5">
+                            Customer weight selector starts strictly from this default weight (never 1kg) and increments upward.
+                          </p>
+                        </div>
+                      </div>
+
+                      {Number(formData.theme_cake_default_weight) > 0 && Number(formData.theme_cake_default_price || formData.base_price) > 0 && (
+                        <div className="text-xs font-bold text-amber-900 bg-white/90 border border-amber-300 px-3 py-1.5 rounded-xl shadow-2xs shrink-0 self-start sm:self-auto">
+                          Derived Rate: <span className="text-chocolate">₹{Math.round(Number(formData.theme_cake_default_price || formData.base_price) / Number(formData.theme_cake_default_weight))}/kg</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 3 Config Inputs */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="bg-white p-3 rounded-xl border border-amber-200 shadow-2xs space-y-1">
+                        <label className="text-[11px] font-bold uppercase tracking-wider text-chocolate block">
+                          Base Starting Weight (kg) *
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            min="0.5"
+                            step="0.5"
+                            required={isThemeCakeSelected}
+                            value={formData.theme_cake_default_weight}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setFormData({
+                                ...formData,
+                                theme_cake_default_weight: val,
+                                weight: val ? `${val}kg` : formData.weight,
+                              });
+                            }}
+                            className="w-full font-bold text-sm text-chocolate p-1.5 rounded-lg border border-slate-200 focus:outline-none focus:border-amber-500"
+                          />
+                          <span className="text-xs font-bold text-slate-400">kg</span>
+                        </div>
+                        <span className="text-[10px] text-slate-400 block">Lowest selectable weight (e.g. 5kg)</span>
+                      </div>
+
+                      <div className="bg-white p-3 rounded-xl border border-amber-200 shadow-2xs space-y-1">
+                        <label className="text-[11px] font-bold uppercase tracking-wider text-chocolate block">
+                          Base Price for Default Weight (₹) *
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-slate-400">₹</span>
+                          <input
+                            type="number"
+                            min="1"
+                            step="1"
+                            required={isThemeCakeSelected}
+                            value={formData.theme_cake_default_price}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setFormData({
+                                ...formData,
+                                theme_cake_default_price: val,
+                                base_price: val || formData.base_price,
+                              });
+                            }}
+                            className="w-full font-bold text-sm text-chocolate p-1.5 rounded-lg border border-slate-200 focus:outline-none focus:border-amber-500"
+                          />
+                        </div>
+                        <span className="text-[10px] text-slate-400 block">Price for starting weight (e.g. ₹2000)</span>
+                      </div>
+
+                      <div className="bg-white p-3 rounded-xl border border-amber-200 shadow-2xs space-y-1">
+                        <label className="text-[11px] font-bold uppercase tracking-wider text-chocolate block">
+                          Step Increment (kg)
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            min="0.5"
+                            step="0.5"
+                            value={formData.theme_cake_step_size}
+                            onChange={(e) => setFormData({ ...formData, theme_cake_step_size: e.target.value })}
+                            className="w-full font-bold text-sm text-chocolate p-1.5 rounded-lg border border-slate-200 focus:outline-none focus:border-amber-500"
+                          />
+                          <span className="text-xs font-bold text-slate-400">kg</span>
+                        </div>
+                        <span className="text-[10px] text-slate-400 block">Stepper step jump (default 1kg)</span>
+                      </div>
+                    </div>
+
+                    {/* Custom Override Price Tiers Table */}
+                    <div className="bg-white p-3.5 rounded-xl border border-amber-200 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <label className="text-xs font-bold text-chocolate block">
+                            Custom Price Overrides Per Step (Optional)
+                          </label>
+                          <span className="text-[10px] text-slate-500">
+                            By default, price scales proportionally based on base rate. Set custom prices below to override specific weights (e.g. 6kg = ₹2300).
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleAddThemeTier}
+                          className="px-2.5 py-1 text-xs font-bold bg-amber-100 hover:bg-amber-200 text-amber-900 rounded-lg transition-all flex items-center gap-1 cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Add Step Override</span>
+                        </button>
+                      </div>
+
+                      {formData.theme_cake_price_tiers && formData.theme_cake_price_tiers.length > 0 ? (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs text-left">
+                            <thead className="bg-amber-50/50 text-slate-600 font-bold border-b border-amber-100">
+                              <tr>
+                                <th className="py-2 px-3">Weight (kg)</th>
+                                <th className="py-2 px-3">Custom Override Price (₹)</th>
+                                <th className="py-2 px-3 text-right">Action</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-amber-100">
+                              {formData.theme_cake_price_tiers.map((tier, idx) => (
+                                <tr key={idx} className="hover:bg-amber-50/20">
+                                  <td className="py-2 px-3">
+                                    <div className="flex items-center gap-1.5 w-28">
+                                      <input
+                                        type="number"
+                                        step="0.5"
+                                        min={Number(formData.theme_cake_default_weight || 1)}
+                                        value={tier.weight}
+                                        onChange={(e) => handleUpdateThemeTier(idx, 'weight', e.target.value)}
+                                        className="w-full font-bold p-1 rounded border border-slate-200 text-xs"
+                                      />
+                                      <span className="text-slate-400 font-bold">kg</span>
+                                    </div>
+                                  </td>
+                                  <td className="py-2 px-3">
+                                    <div className="flex items-center gap-1.5 w-32">
+                                      <span className="text-slate-400 font-bold">₹</span>
+                                      <input
+                                        type="number"
+                                        min="1"
+                                        value={tier.price}
+                                        onChange={(e) => handleUpdateThemeTier(idx, 'price', e.target.value)}
+                                        className="w-full font-bold p-1 rounded border border-slate-200 text-xs text-chocolate"
+                                      />
+                                    </div>
+                                  </td>
+                                  <td className="py-2 px-3 text-right">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveThemeTier(idx)}
+                                      className="text-rose-500 hover:text-rose-700 font-bold p-1 hover:bg-rose-50 rounded"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <div className="p-2.5 rounded-lg bg-amber-50/50 border border-amber-100 text-[11px] text-amber-800">
+                          ✨ No step overrides added. Weights will automatically scale proportionally: <em>{formData.theme_cake_default_weight || 5}kg = ₹{formData.theme_cake_default_price || formData.base_price || 2000}</em>, <em>{(Number(formData.theme_cake_default_weight || 5) + Number(formData.theme_cake_step_size || 1))}kg = ₹{Math.round((Number(formData.theme_cake_default_price || formData.base_price || 2000) / Number(formData.theme_cake_default_weight || 5)) * (Number(formData.theme_cake_default_weight || 5) + Number(formData.theme_cake_step_size || 1)))}</em>, etc.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* DESSERT DYNAMIC PIECE QUANTITY & PRICING RULES */}
+                {isDessertSelected && (
+                  <div className="sm:col-span-2 rounded-2xl border-2 border-rose-300 bg-rose-50/40 p-4 sm:p-5 transition-all shadow-sm space-y-4">
+                    <div className="flex items-center justify-between gap-3 border-b border-rose-200/80 pb-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl">🍮</span>
+                          <h4 className="text-sm font-black text-chocolate">
+                            Dessert Piece Quantity &amp; Dynamic Pricing
+                          </h4>
+                          <span className="text-[10px] font-bold bg-rose-100 text-rose-800 px-2 py-0.5 rounded-full border border-rose-300">
+                            Desserts Mode (Pieces Only — No Weight)
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-1">
+                          Dessert products are strictly measured in <strong>Pieces</strong>. Customers start from the minimum piece count and can only scale up in 1-piece steps.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Core Inputs: Minimum Quantity & Default Price */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                          Minimum Order Quantity (Pcs) *
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          step="1"
+                          required={isDessertSelected}
+                          value={formData.dessert_min_quantity}
+                          onChange={(e) => {
+                            const val = Math.max(1, parseInt(e.target.value) || 1);
+                            setFormData((prev) => ({ ...prev, dessert_min_quantity: val }));
+                          }}
+                          placeholder="e.g. 2"
+                          className="w-full px-3 py-2 rounded-xl border border-rose-200 bg-white text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-rose-400 font-mono"
+                        />
+                        <p className="text-[10px] text-slate-400 mt-1">
+                          The starting piece count (e.g. 2 pcs). Customer cannot order fewer pieces.
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                          Default Price for Min Quantity (₹) *
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          required={isDessertSelected}
+                          value={formData.dessert_default_price}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setFormData((prev) => ({
+                              ...prev,
+                              dessert_default_price: val,
+                              base_price: val,
+                            }));
+                          }}
+                          placeholder="e.g. 100"
+                          className="w-full px-3 py-2 rounded-xl border border-rose-200 bg-white text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-rose-400 font-mono"
+                        />
+                        <p className="text-[10px] text-slate-400 mt-1">
+                          Total price for {formData.dessert_min_quantity || 2} pieces.
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                          Step Increment (Pcs)
+                        </label>
+                        <input
+                          type="text"
+                          disabled
+                          value="1 Piece (Fixed)"
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-100 text-xs font-semibold text-slate-500 cursor-not-allowed font-mono"
+                        />
+                        <p className="text-[10px] text-slate-400 mt-1">
+                          Each &ldquo;+&rdquo; tap adds exactly 1 piece: {formData.dessert_min_quantity || 2} → {Number(formData.dessert_min_quantity || 2) + 1} → {Number(formData.dessert_min_quantity || 2) + 2}…
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Derived Rate & Live Stepper Preview */}
+                    <div className="bg-white/80 rounded-xl p-3 border border-rose-200 space-y-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-slate-700">Calculated Unit Rate:</span>
+                          <span className="bg-rose-100 text-rose-800 px-2 py-0.5 rounded font-black font-mono">
+                            ₹{Number(formData.dessert_default_price || formData.base_price || 0) > 0 && Number(formData.dessert_min_quantity || 1) > 0
+                              ? (Number(formData.dessert_default_price || formData.base_price || 0) / Number(formData.dessert_min_quantity || 1)).toFixed(2)
+                              : '0.00'} / piece
+                          </span>
+                        </div>
+                        <span className="text-[11px] text-slate-500 italic">
+                          Prices for quantities without custom overrides scale linearly at this unit rate.
+                        </span>
+                      </div>
+
+                      {/* Preview Pill Chips */}
+                      <div className="pt-2 border-t border-rose-100">
+                        <span className="text-[11px] font-bold text-slate-600 block mb-1.5">
+                          Customer Stepper Preview:
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {[0, 1, 2, 3, 4].map((stepIdx) => {
+                            const qty = Number(formData.dessert_min_quantity || 2) + stepIdx;
+                            const tierOverride = (formData.dessert_price_tiers || []).find(
+                              (t) => Number(t.quantity) === qty
+                            );
+                            const unitPrice =
+                              Number(formData.dessert_min_quantity || 1) > 0
+                                ? Number(formData.dessert_default_price || formData.base_price || 0) / Number(formData.dessert_min_quantity || 1)
+                                : 0;
+                            const price = tierOverride ? Number(tierOverride.price) : Math.round(unitPrice * qty);
+
+                            return (
+                              <span
+                                key={qty}
+                                className={`text-[11px] px-2.5 py-1 rounded-lg border font-mono ${
+                                  stepIdx === 0
+                                    ? 'bg-rose-600 text-white border-rose-600 font-black'
+                                    : 'bg-white text-slate-700 border-slate-200'
+                                }`}
+                              >
+                                {qty} Pcs = ₹{price}
+                                {stepIdx === 0 && ' (Min Base)'}
+                                {tierOverride && ' 🏷️'}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Custom Override Tiers */}
+                    <div className="space-y-2 pt-1">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-xs font-black text-chocolate">
+                            Custom Price Tiers (Optional Overrides)
+                          </span>
+                          <p className="text-[11px] text-slate-500">
+                            Override linear pricing for specific piece quantities (e.g. 5 pcs = ₹220, 10 pcs = ₹400).
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleAddDessertTier}
+                          className="text-xs font-bold text-rose-700 hover:text-rose-900 bg-rose-100 hover:bg-rose-200 px-3 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1 border border-rose-300"
+                        >
+                          <Plus className="w-3.5 h-3.5" /> Add Tier Override
+                        </button>
+                      </div>
+
+                      {formData.dessert_price_tiers && formData.dessert_price_tiers.length > 0 ? (
+                        <div className="overflow-x-auto rounded-xl border border-rose-200 bg-white">
+                          <table className="w-full text-xs text-left">
+                            <thead className="bg-rose-50/70 border-b border-rose-200 text-[10px] font-bold text-slate-600 uppercase">
+                              <tr>
+                                <th className="p-2">Quantity (Pieces)</th>
+                                <th className="p-2">Custom Price (₹)</th>
+                                <th className="p-2">Effective Rate</th>
+                                <th className="p-2 text-right">Action</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-rose-100 font-mono">
+                              {formData.dessert_price_tiers.map((tier, idx) => (
+                                <tr key={idx} className="hover:bg-rose-50/30">
+                                  <td className="p-2">
+                                    <div className="flex items-center gap-1">
+                                      <input
+                                        type="number"
+                                        min={formData.dessert_min_quantity || 1}
+                                        value={tier.quantity}
+                                        onChange={(e) => handleUpdateDessertTier(idx, 'quantity', e.target.value)}
+                                        className="w-20 px-2 py-1 rounded border border-slate-200 font-bold focus:outline-none focus:border-rose-400"
+                                      />
+                                      <span className="text-slate-500 font-sans text-xs">Pcs</span>
+                                    </div>
+                                  </td>
+                                  <td className="p-2">
+                                    <div className="flex items-center gap-1">
+                                      <span className="text-slate-500 font-sans">₹</span>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        value={tier.price}
+                                        onChange={(e) => handleUpdateDessertTier(idx, 'price', e.target.value)}
+                                        className="w-24 px-2 py-1 rounded border border-slate-200 font-bold focus:outline-none focus:border-rose-400"
+                                      />
+                                    </div>
+                                  </td>
+                                  <td className="p-2 text-slate-500 text-[11px]">
+                                    {Number(tier.quantity) > 0 && Number(tier.price) > 0
+                                      ? `₹${(Number(tier.price) / Number(tier.quantity)).toFixed(2)}/pc`
+                                      : '—'}
+                                  </td>
+                                  <td className="p-2 text-right">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveDessertTier(idx)}
+                                      className="text-rose-500 hover:text-rose-700 p-1 hover:bg-rose-50 rounded cursor-pointer transition-colors"
+                                      title="Remove tier"
+                                    >
+                                      ✕
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <div className="p-2.5 rounded-lg bg-rose-50/50 border border-rose-100 text-[11px] text-rose-800">
+                          ✨ No step overrides added. Quantities will automatically scale linearly: <em>{formData.dessert_min_quantity || 2} Pcs = ₹{formData.dessert_default_price || formData.base_price || 100}</em>, <em>{(Number(formData.dessert_min_quantity || 2) + 1)} Pcs = ₹{Math.round(((Number(formData.dessert_default_price || formData.base_price || 100) / Number(formData.dessert_min_quantity || 2))) * (Number(formData.dessert_min_quantity || 2) + 1))}</em>, etc.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* DRY FRUIT PACKAGING RULE SECTION */}
+                {isDryFruitSelected && (
+                  <div className="sm:col-span-2 rounded-2xl border-2 border-emerald-400 bg-gradient-to-br from-emerald-50/80 via-white to-teal-50/50 p-4 sm:p-5 shadow-sm space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl">🥜</span>
+                          <h4 className="text-sm font-black text-emerald-950">
+                            Dry Fruit Discrete Pack Packaging &amp; Pricing
+                          </h4>
+                          <span className="text-[10px] font-extrabold bg-emerald-600 text-white px-2.5 py-0.5 rounded-full shadow-xs uppercase tracking-wide">
+                            Category: Dry Fruits Only
+                          </span>
+                        </div>
+                        <p className="text-xs text-emerald-800/80 mt-1">
+                          Define discrete pack sizes (grams or kg only). Customers only see these exact packs. Quantity stepper (+ / −) multiplies the <strong>number of packs</strong>, not the weight.
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleAddDryFruitPack}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 active:scale-95 rounded-xl border border-emerald-300 transition-all cursor-pointer shrink-0"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        Add Pack Option
+                      </button>
+                    </div>
+
+                    {/* Pack Options Table / List */}
+                    <div className="space-y-3">
+                      {(formData.dry_fruit_pack_options || []).length > 0 ? (
+                        <div className="overflow-x-auto rounded-xl border border-emerald-200 bg-white shadow-2xs">
+                          <table className="w-full text-xs text-left">
+                            <thead className="bg-emerald-100/70 text-emerald-950 font-bold uppercase tracking-wider text-[10px] border-b border-emerald-200">
+                              <tr>
+                                <th className="px-3 py-2.5">#</th>
+                                <th className="px-3 py-2.5">Pack Weight</th>
+                                <th className="px-3 py-2.5">Unit (g / kg)</th>
+                                <th className="px-3 py-2.5">Pack Label</th>
+                                <th className="px-3 py-2.5">Pack Price (₹)</th>
+                                <th className="px-3 py-2.5 text-center">Action</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-emerald-100">
+                              {(formData.dry_fruit_pack_options || []).map((pack, idx) => (
+                                <tr key={idx} className="hover:bg-emerald-50/40 transition-colors">
+                                  <td className="px-3 py-2 font-bold text-emerald-800">
+                                    Pack {idx + 1}
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    <input
+                                      type="number"
+                                      min="1"
+                                      step="any"
+                                      value={pack.weight}
+                                      onChange={(e) => handleUpdateDryFruitPack(idx, 'weight', e.target.value)}
+                                      className="w-24 px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 font-mono"
+                                      placeholder="e.g. 200"
+                                    />
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    <select
+                                      value={pack.unit || 'g'}
+                                      onChange={(e) => handleUpdateDryFruitPack(idx, 'unit', e.target.value)}
+                                      className="px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                    >
+                                      <option value="g">Grams (g)</option>
+                                      <option value="kg">Kilograms (kg)</option>
+                                    </select>
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-emerald-100 text-emerald-900 font-extrabold text-xs font-mono">
+                                      {pack.weight || 0}{pack.unit || 'g'}
+                                    </span>
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    <div className="relative w-28">
+                                      <span className="absolute inset-y-0 left-0 pl-2 flex items-center text-slate-400 font-bold">₹</span>
+                                      <input
+                                        type="number"
+                                        min="1"
+                                        value={pack.price}
+                                        onChange={(e) => handleUpdateDryFruitPack(idx, 'price', e.target.value)}
+                                        className="w-full pl-6 pr-2 py-1.5 rounded-lg border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 font-mono"
+                                        placeholder="Price"
+                                      />
+                                    </div>
+                                  </td>
+                                  <td className="px-3 py-2 text-center">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveDryFruitPack(idx)}
+                                      className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors cursor-pointer"
+                                      title="Remove Pack"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <div className="p-4 rounded-xl bg-white border border-dashed border-emerald-300 text-center space-y-2">
+                          <p className="text-xs text-emerald-800 font-medium">
+                            No pack options defined yet. Add discrete packs (e.g. 200g, 500g, 1kg) for customers to choose from.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={handleAddDryFruitPack}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg cursor-pointer"
+                          >
+                            <Plus className="w-3.5 h-3.5" /> Add First Pack
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Live Customer Preview */}
+                      {(formData.dry_fruit_pack_options || []).length > 0 && (
+                        <div className="p-3 bg-emerald-50/60 rounded-xl border border-emerald-200">
+                          <div className="text-[11px] font-bold text-emerald-900 mb-1.5 flex items-center gap-1.5">
+                            <span>👀 Customer View Preview:</span>
+                            <span className="text-[10px] font-normal text-emerald-700">(Discrete pack chips shown to customer)</span>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {(formData.dry_fruit_pack_options || []).map((p, idx) => (
+                              <div
+                                key={idx}
+                                className="px-3 py-1.5 rounded-lg bg-white border border-emerald-300 shadow-2xs flex items-center gap-2"
+                              >
+                                <span className="font-extrabold text-xs text-slate-800 font-mono">
+                                  {p.weight || 0}{p.unit || 'g'}
+                                </span>
+                                <span className="text-xs font-black text-emerald-700 font-mono">
+                                  ₹{p.price || 0}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {/* SNACK FLEXIBLE PRICING SECTION */}
+                {!isThemeCakeSelected && !isDessertSelected && !isDryFruitSelected && (
                 <div className="sm:col-span-2">
                   <div className="rounded-2xl border-2 border-amber-300 bg-amber-50/50 p-4 sm:p-5 transition-all shadow-sm">
                     <div className="flex items-center justify-between gap-3 mb-3">
@@ -1494,9 +2340,10 @@ const AdminProductsPage = () => {
                     )}
                   </div>
                 </div>
+                )}
 
                 {/* PORTION & WEIGHT CONFIGURATION SECTION */}
-                {!formData.enable_snack_matrix && (
+                {!formData.enable_snack_matrix && !isThemeCakeSelected && !isDessertSelected && !isDryFruitSelected && (
                 <div className="sm:col-span-2 bg-gradient-to-br from-amber-50/70 to-white p-4 sm:p-5 rounded-2xl border-2 border-amber-200/80 space-y-4">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
@@ -2441,7 +3288,7 @@ const AdminProductsPage = () => {
                 {formData.image_url && (
                   <div className="flex items-center gap-3 pt-2">
                     <img
-                      src={formData.image_url}
+                      src={formatImageUrl(formData.image_url)}
                       alt="Preview"
                       className="w-16 h-16 rounded-xl object-cover border border-amber-300 shadow-2xs"
                       onError={(e) => {

@@ -35,4 +35,16 @@ class Category extends Model
     {
         return $this->hasMany(Product::class);
     }
+
+    /**
+     * Always normalize image to relative /storage/... so it loads over tunnels & mobile
+     */
+    public function getImageAttribute($value)
+    {
+        if (empty($value)) return $value;
+        if (str_contains($value, '/storage/')) {
+            return substr($value, strpos($value, '/storage/'));
+        }
+        return $value;
+    }
 }

@@ -36,4 +36,16 @@ class Subcategory extends Model
     {
         return $this->hasMany(Product::class);
     }
+
+    /**
+     * Always normalize image_url to relative /storage/... so it loads over tunnels & mobile
+     */
+    public function getImageUrlAttribute($value)
+    {
+        if (empty($value)) return $value;
+        if (str_contains($value, '/storage/')) {
+            return substr($value, strpos($value, '/storage/'));
+        }
+        return $value;
+    }
 }

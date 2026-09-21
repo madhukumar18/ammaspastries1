@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import { ChevronLeft, ChevronRight, Sparkles, ArrowRight } from 'lucide-react';
+import { formatImageUrl } from '../../utils/imageUrl';
 
 const DEFAULT_CATEGORIES = [
   {
@@ -306,7 +307,7 @@ const CategoryImagesCarousel = ({ isAboveTheFold = false, className = '' }) => {
                     }`}
                   >
                     <img
-                      src={item.image_url}
+                      src={formatImageUrl(item.image_url)}
                       alt={item.name}
                       loading="lazy"
                       className={`w-full h-full object-cover transition-transform duration-500 ease-out ${

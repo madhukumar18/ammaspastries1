@@ -105,7 +105,7 @@ class AdminPhotoCakeController extends Controller
         $fileName = 'shape_' . $cleanName . '_' . time() . '_' . Str::random(6) . '.' . $extension;
 
         $path = $file->storeAs('uploads/photocakes', $fileName, 'public');
-        $url = asset("storage/{$path}");
+        $url = "/storage/{$path}";
 
         return response()->json([
             'success' => true,

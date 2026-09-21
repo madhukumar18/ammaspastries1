@@ -20,12 +20,24 @@ class RistaPosService
 
     public function __construct()
     {
-        $this->baseUrl = rtrim(env('RISTA_API_BASE_URL', 'https://api.ristaapps.com/v1'), '/');
-        $this->apiKey = env('RISTA_API_KEY', '761129c2-9fa5-416b-9cb4-333741520e8e');
-        $this->apiSecret = env('RISTA_API_SECRET', '38d7hjD0j9UHLHE5WilYvL3VX24l+EVP3UHMHE9dJ8Qo');
-        $this->configuredToken = env('RISTA_API_TOKEN');
-        $this->autoSync = filter_var(env('RISTA_AUTO_SYNC', true), FILTER_VALIDATE_BOOLEAN);
-        $this->verifySsl = filter_var(env('RISTA_SSL_VERIFY', false), FILTER_VALIDATE_BOOLEAN);
+        $envVars = [];
+        $envFile = base_path('.env');
+        if (file_exists($envFile)) {
+            $lines = @file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
+            foreach ($lines as $line) {
+                $line = trim($line);
+                if (str_starts_with($line, '#') || !str_contains($line, '=')) continue;
+                [$key, $val] = explode('=', $line, 2);
+                $envVars[trim($key)] = trim($val, " \t\n\r\0\x0B\"'");
+            }
+        }
+
+        $this->baseUrl = rtrim($envVars['RISTA_API_BASE_URL'] ?? env('RISTA_API_BASE_URL', 'https://api.ristaapps.com/v1'), '/');
+        $this->apiKey = $envVars['RISTA_API_KEY'] ?? env('RISTA_API_KEY');
+        $this->apiSecret = $envVars['RISTA_API_SECRET'] ?? env('RISTA_API_SECRET');
+        $this->configuredToken = $envVars['RISTA_API_TOKEN'] ?? env('RISTA_API_TOKEN');
+        $this->autoSync = filter_var($envVars['RISTA_AUTO_SYNC'] ?? env('RISTA_AUTO_SYNC', true), FILTER_VALIDATE_BOOLEAN);
+        $this->verifySsl = filter_var($envVars['RISTA_SSL_VERIFY'] ?? env('RISTA_SSL_VERIFY', false), FILTER_VALIDATE_BOOLEAN);
     }
 
     /**
@@ -420,16 +432,18 @@ class RistaPosService
                 'success' => $isSuccess,
                 'status_code' => $status,
                 'gateway_url' => $this->baseUrl,
+                'api_key_masked' => !empty($this->apiKey) ? (substr($this->apiKey, 0, 6) . '...' . substr($this->apiKey, -4)) : 'Not Configured',
                 'auth_type' => 'Official JWT (x-api-key + x-api-token HS256)',
                 'message' => $isSuccess
                     ? 'Connected to Rista POS Gateway successfully! (HTTP 200 OK)'
-                    : "Gateway responded with status HTTP {$status}",
+                    : "Gateway responded with status HTTP {$status}" . ($response->json('message') ? " ({$response->json('message')})" : ""),
             ];
         } catch (Throwable $e) {
             return [
                 'success' => false,
                 'status_code' => 500,
                 'gateway_url' => $this->baseUrl,
+                'api_key_masked' => !empty($this->apiKey) ? (substr($this->apiKey, 0, 6) . '...' . substr($this->apiKey, -4)) : 'Not Configured',
                 'message' => 'Connection attempted: ' . $e->getMessage(),
             ];
         }

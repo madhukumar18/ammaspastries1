@@ -8,6 +8,7 @@ use Illuminate\Support\Str;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\ProductImage;
+use App\Models\Category;
 
 class AdminProductController extends Controller
 {
@@ -89,6 +90,22 @@ class AdminProductController extends Controller
             'variants.*.size_weight' => 'required|string',
             'variants.*.price' => 'required|numeric|min:0',
             'variants.*.discount_price' => 'nullable|numeric|min:0',
+            'theme_cake_default_weight' => 'nullable|numeric|min:0.1',
+            'theme_cake_default_price' => 'nullable|numeric|min:1',
+            'theme_cake_step_size' => 'nullable|numeric|min:0.1',
+            'theme_cake_price_tiers' => 'nullable|array',
+            'theme_cake_price_tiers.*.weight' => 'required_with:theme_cake_price_tiers|numeric|min:0.1',
+            'theme_cake_price_tiers.*.price' => 'required_with:theme_cake_price_tiers|numeric|min:1',
+            'dessert_min_quantity' => 'nullable|integer|min:1',
+            'dessert_default_price' => 'nullable|numeric|min:0',
+            'dessert_step_size' => 'nullable|integer|min:1',
+            'dessert_price_tiers' => 'nullable|array',
+            'dessert_price_tiers.*.quantity' => 'required_with:dessert_price_tiers|integer|min:1',
+            'dessert_price_tiers.*.price' => 'required_with:dessert_price_tiers|numeric|min:0',
+            'dry_fruit_pack_options' => 'nullable|array',
+            'dry_fruit_pack_options.*.weight' => 'required_with:dry_fruit_pack_options|numeric|min:0.01',
+            'dry_fruit_pack_options.*.unit' => 'required_with:dry_fruit_pack_options|string|in:g,kg,grams,kilograms',
+            'dry_fruit_pack_options.*.price' => 'required_with:dry_fruit_pack_options|numeric|min:0.01',
         ]);
 
         $slug = Str::slug($validated['name']);
@@ -137,24 +154,101 @@ class AdminProductController extends Controller
                 if (!empty($sv['weight'])) {
                     $validated['portion_unit'] = $sv['weight']['unit'] ?? 'grams';
                     $validated['weight'] = $sv['weight']['value'] ?? '500g';
-                    if (isset($sv['weight']['eggless_price']) && $sv['weight']['eggless_price'] !== '') {
-                        $validated['eggless_price'] = (float) $sv['weight']['eggless_price'];
-                    }
-                    if (isset($sv['weight']['egg_price']) && $sv['weight']['egg_price'] !== '') {
-                        $validated['egg_price'] = (float) $sv['weight']['egg_price'];
-                    }
                 }
                 if (!empty($sv['piece'])) {
-                    $piecePrice = $sv['piece']['eggless_price'] ?? $sv['piece']['egg_price'] ?? null;
-                    if ($piecePrice !== null) {
-                        $validated['piece_price'] = (float) $piecePrice;
+                    if (isset($sv['piece']['eggless_price']) && $sv['piece']['eggless_price'] !== '') {
+                        $validated['piece_price'] = (float) $sv['piece']['eggless_price'];
+                        $validated['piece_min'] = 1;
+                        $validated['piece_limit'] = 20;
+                    } elseif (isset($sv['piece']['egg_price']) && $sv['piece']['egg_price'] !== '') {
+                        $validated['piece_price'] = (float) $sv['piece']['egg_price'];
+                        $validated['piece_min'] = 1;
+                        $validated['piece_limit'] = 20;
                     }
                 }
-                $base = $validated['piece_price'] ?? $validated['eggless_price'] ?? $validated['egg_price'] ?? null;
-                if ($base !== null) {
-                    $validated['base_price'] = (float) $base;
+                if (!empty($sv['weight'])) {
+                    if (isset($sv['weight']['eggless_price']) && $sv['weight']['eggless_price'] !== '') {
+                        $validated['base_price'] = (float) $sv['weight']['eggless_price'];
+                    } elseif (isset($sv['weight']['egg_price']) && $sv['weight']['egg_price'] !== '') {
+                        $validated['base_price'] = (float) $sv['weight']['egg_price'];
+                    }
                 }
             }
+        }
+
+        // Sync theme_cake_default_price into base columns if configured
+        if (!empty($validated['theme_cake_default_price']) && !empty($validated['theme_cake_default_weight'])) {
+            $validated['base_price'] = (float) $validated['theme_cake_default_price'];
+            $validated['weight'] = ((float) $validated['theme_cake_default_weight']) . 'kg';
+        }
+
+        // Category-specific validations and synchronizations
+        $catId = $validated['category_id'] ?? null;
+        $category = $catId ? Category::find($catId) : null;
+        $isDessert = ($catId == 3) || ($category && ($category->slug === 'dessert' || str_contains(strtolower($category->name), 'dessert')));
+        $isDryFruit = ($catId == 4) || ($category && ($category->slug === 'dry-fruits' || str_contains(strtolower($category->name), 'dry fruit')));
+
+        if ($isDessert) {
+            $minQty = max(1, (int) ($validated['dessert_min_quantity'] ?? 1));
+            $validated['dessert_min_quantity'] = $minQty;
+            $validated['dessert_step_size'] = 1;
+            if (isset($validated['dessert_default_price']) && (float) $validated['dessert_default_price'] > 0) {
+                $validated['base_price'] = (float) $validated['dessert_default_price'];
+            }
+            $validated['weight'] = "{$minQty} Pcs";
+            $validated['portion_type'] = 'portion';
+            $validated['portion_unit'] = 'pieces';
+            $validated['portion_step'] = '1';
+        }
+
+        if ($isDryFruit) {
+            if (empty($validated['dry_fruit_pack_options']) || !is_array($validated['dry_fruit_pack_options'])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'At least one pack option with weight, unit (g/kg), and price is required for Dry Fruits.',
+                ], 422);
+            }
+
+            $cleanedPacks = [];
+            $lowestPrice = null;
+            $firstLabel = null;
+            foreach ($validated['dry_fruit_pack_options'] as $p) {
+                $w = (float) ($p['weight'] ?? 0);
+                $u = strtolower(trim($p['unit'] ?? 'g'));
+                if ($u === 'grams' || $u === 'gram') $u = 'g';
+                if ($u === 'kilograms' || $u === 'kilogram') $u = 'kg';
+                if (!in_array($u, ['g', 'kg'])) $u = 'g';
+                $price = (float) ($p['price'] ?? 0);
+
+                if ($w > 0 && $price > 0) {
+                    $label = ($w == (int) $w ? (int) $w : $w) . $u;
+                    $cleanedPacks[] = [
+                        'weight' => $w,
+                        'unit' => $u,
+                        'label' => $label,
+                        'price' => round($price, 2),
+                    ];
+                    if ($lowestPrice === null || $price < $lowestPrice) {
+                        $lowestPrice = $price;
+                    }
+                    if ($firstLabel === null) {
+                        $firstLabel = $label;
+                    }
+                }
+            }
+
+            if (empty($cleanedPacks)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'At least one valid pack size with weight > 0 and price > 0 is required for Dry Fruits.',
+                ], 422);
+            }
+
+            $validated['dry_fruit_pack_options'] = $cleanedPacks;
+            $validated['base_price'] = $lowestPrice ?? (float) ($validated['base_price'] ?? 100);
+            $validated['weight'] = $firstLabel ?? 'Pack';
+            $validated['portion_type'] = 'weight';
+            $validated['portion_unit'] = 'grams';
         }
 
         $variants = $validated['variants'] ?? [];
@@ -239,6 +333,22 @@ class AdminProductController extends Controller
             'cupcake_variants' => 'nullable|array',
             'snack_variants' => 'nullable|array',
             'variants' => 'nullable|array',
+            'theme_cake_default_weight' => 'nullable|numeric|min:0.1',
+            'theme_cake_default_price' => 'nullable|numeric|min:1',
+            'theme_cake_step_size' => 'nullable|numeric|min:0.1',
+            'theme_cake_price_tiers' => 'nullable|array',
+            'theme_cake_price_tiers.*.weight' => 'required_with:theme_cake_price_tiers|numeric|min:0.1',
+            'theme_cake_price_tiers.*.price' => 'required_with:theme_cake_price_tiers|numeric|min:1',
+            'dessert_min_quantity' => 'nullable|integer|min:1',
+            'dessert_default_price' => 'nullable|numeric|min:0',
+            'dessert_step_size' => 'nullable|integer|min:1',
+            'dessert_price_tiers' => 'nullable|array',
+            'dessert_price_tiers.*.quantity' => 'required_with:dessert_price_tiers|integer|min:1',
+            'dessert_price_tiers.*.price' => 'required_with:dessert_price_tiers|numeric|min:0',
+            'dry_fruit_pack_options' => 'nullable|array',
+            'dry_fruit_pack_options.*.weight' => 'required_with:dry_fruit_pack_options|numeric|min:0.01',
+            'dry_fruit_pack_options.*.unit' => 'required_with:dry_fruit_pack_options|string|in:g,kg,grams,kilograms',
+            'dry_fruit_pack_options.*.price' => 'required_with:dry_fruit_pack_options|numeric|min:0.01',
         ]);
 
         // Sync snack_variants into base columns if present
@@ -297,6 +407,82 @@ class AdminProductController extends Controller
                     $validated['base_price'] = (float) $base;
                 }
             }
+        }
+
+        // Sync theme_cake_default_price into base columns if configured
+        if (!empty($validated['theme_cake_default_price']) && !empty($validated['theme_cake_default_weight'])) {
+            $validated['base_price'] = (float) $validated['theme_cake_default_price'];
+            $validated['weight'] = ((float) $validated['theme_cake_default_weight']) . 'kg';
+        }
+
+        // Sync dessert_default_price and piece-based quantity if configured or category is Dessert
+        $catId = $validated['category_id'] ?? $product->category_id;
+        $category = $catId ? Category::find($catId) : null;
+        $isDessert = ($catId == 3) || ($category && ($category->slug === 'dessert' || str_contains(strtolower($category->name), 'dessert')));
+        $isDryFruit = ($catId == 4) || ($category && ($category->slug === 'dry-fruits' || str_contains(strtolower($category->name), 'dry fruit')));
+
+        if ($isDessert) {
+            $minQty = max(1, (int) ($validated['dessert_min_quantity'] ?? $product->dessert_min_quantity ?? 1));
+            $validated['dessert_min_quantity'] = $minQty;
+            $validated['dessert_step_size'] = 1;
+            if (isset($validated['dessert_default_price']) && (float) $validated['dessert_default_price'] > 0) {
+                $validated['base_price'] = (float) $validated['dessert_default_price'];
+            }
+            $validated['weight'] = "{$minQty} Pcs";
+            $validated['portion_type'] = 'portion';
+            $validated['portion_unit'] = 'pieces';
+            $validated['portion_step'] = '1';
+        }
+
+        if ($isDryFruit) {
+            $packsInput = $validated['dry_fruit_pack_options'] ?? $product->dry_fruit_pack_options;
+            if (empty($packsInput) || !is_array($packsInput)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'At least one pack option with weight, unit (g/kg), and price is required for Dry Fruits.',
+                ], 422);
+            }
+
+            $cleanedPacks = [];
+            $lowestPrice = null;
+            $firstLabel = null;
+            foreach ($packsInput as $p) {
+                $w = (float) ($p['weight'] ?? 0);
+                $u = strtolower(trim($p['unit'] ?? 'g'));
+                if ($u === 'grams' || $u === 'gram') $u = 'g';
+                if ($u === 'kilograms' || $u === 'kilogram') $u = 'kg';
+                if (!in_array($u, ['g', 'kg'])) $u = 'g';
+                $price = (float) ($p['price'] ?? 0);
+
+                if ($w > 0 && $price > 0) {
+                    $label = ($w == (int) $w ? (int) $w : $w) . $u;
+                    $cleanedPacks[] = [
+                        'weight' => $w,
+                        'unit' => $u,
+                        'label' => $label,
+                        'price' => round($price, 2),
+                    ];
+                    if ($lowestPrice === null || $price < $lowestPrice) {
+                        $lowestPrice = $price;
+                    }
+                    if ($firstLabel === null) {
+                        $firstLabel = $label;
+                    }
+                }
+            }
+
+            if (empty($cleanedPacks)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'At least one valid pack size with weight > 0 and price > 0 is required for Dry Fruits.',
+                ], 422);
+            }
+
+            $validated['dry_fruit_pack_options'] = $cleanedPacks;
+            $validated['base_price'] = $lowestPrice ?? (float) ($validated['base_price'] ?? $product->base_price ?? 100);
+            $validated['weight'] = $firstLabel ?? $product->weight ?? 'Pack';
+            $validated['portion_type'] = 'weight';
+            $validated['portion_unit'] = 'grams';
         }
 
         $variants = $validated['variants'] ?? null;

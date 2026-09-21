@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import api from '../../services/api';
 import { useApp } from '../../context/AppContext';
+import { formatImageUrl } from '../../utils/imageUrl';
 import {
   Crown,
   Sparkles,
@@ -19,7 +20,9 @@ import {
   AlertCircle,
   FolderPlus,
   Coins,
-  ArrowRight
+  ArrowRight,
+  Scale,
+  Calculator
 } from 'lucide-react';
 
 const STANDARD_FLAVOUR_PRESETS = [
@@ -54,7 +57,11 @@ const AdminThemeCakePage = () => {
     subcategory_id: '',
     description: '',
     image_url: '',
-    weight: '1kg / Designer Spec',
+    weight: '5kg',
+    theme_cake_default_weight: 5,
+    theme_cake_default_price: 2000,
+    theme_cake_step_size: 1,
+    theme_cake_price_tiers: [],
     is_active: true,
     flavours: [],
   });
@@ -162,7 +169,11 @@ const AdminThemeCakePage = () => {
       subcategory_id: subcategories[0]?.id || '',
       description: '',
       image_url: 'https://images.unsplash.com/photo-1535141192574-5d4897c13136?w=700&q=85',
-      weight: '1kg / Designer Spec',
+      weight: '5kg',
+      theme_cake_default_weight: 5,
+      theme_cake_default_price: 2000,
+      theme_cake_step_size: 1,
+      theme_cake_price_tiers: [],
       is_active: true,
       flavours: [
         { name: 'Dutch Chocolate Truffle', egg_price: 500, eggless_price: 550 },
@@ -181,17 +192,70 @@ const AdminThemeCakePage = () => {
           { name: 'Dutch Chocolate Truffle', egg_price: Number(cake.egg_price || cake.base_price || 500), eggless_price: Number(cake.eggless_price || 550) },
         ];
 
+    const defWeight = cake.theme_cake_default_weight !== undefined && cake.theme_cake_default_weight !== null
+      ? Number(cake.theme_cake_default_weight)
+      : 5;
+    const defPrice = cake.theme_cake_default_price !== undefined && cake.theme_cake_default_price !== null
+      ? Number(cake.theme_cake_default_price)
+      : (Number(cake.base_price) || 2000);
+    const stepSize = cake.theme_cake_step_size !== undefined && cake.theme_cake_step_size !== null
+      ? Number(cake.theme_cake_step_size)
+      : 1;
+    const tiers = Array.isArray(cake.theme_cake_price_tiers) ? cake.theme_cake_price_tiers : [];
+
     setCakeForm({
       name: cake.name || '',
       sku: cake.sku || '',
       subcategory_id: cake.subcategory_id || '',
       description: cake.description || '',
       image_url: cake.image_url || '',
-      weight: cake.weight || '1kg / Designer Spec',
+      weight: cake.weight || `${defWeight}kg`,
+      theme_cake_default_weight: defWeight,
+      theme_cake_default_price: defPrice,
+      theme_cake_step_size: stepSize,
+      theme_cake_price_tiers: tiers,
       is_active: Boolean(cake.is_active),
       flavours: flavoursList,
     });
     setCakeModalOpen(true);
+  };
+
+  // Theme Cake Custom Tier Row Management
+  const handleAddTierRow = () => {
+    const lastWeight = cakeForm.theme_cake_price_tiers?.length > 0
+      ? Number(cakeForm.theme_cake_price_tiers[cakeForm.theme_cake_price_tiers.length - 1].weight)
+      : Number(cakeForm.theme_cake_default_weight || 5);
+    const step = Number(cakeForm.theme_cake_step_size || 1);
+    const newWeight = Math.round((lastWeight + step) * 10) / 10;
+    const defW = Number(cakeForm.theme_cake_default_weight || 5);
+    const defP = Number(cakeForm.theme_cake_default_price || 2000);
+    const calculatedPrice = defW > 0 ? Math.round((defP / defW) * newWeight) : defP;
+
+    setCakeForm((prev) => ({
+      ...prev,
+      theme_cake_price_tiers: [
+        ...(prev.theme_cake_price_tiers || []),
+        { weight: newWeight, price: calculatedPrice },
+      ],
+    }));
+  };
+
+  const handleUpdateTierRow = (index, field, value) => {
+    setCakeForm((prev) => {
+      const nextTiers = [...(prev.theme_cake_price_tiers || [])];
+      nextTiers[index] = {
+        ...nextTiers[index],
+        [field]: Number(value),
+      };
+      return { ...prev, theme_cake_price_tiers: nextTiers };
+    });
+  };
+
+  const handleRemoveTierRow = (index) => {
+    setCakeForm((prev) => ({
+      ...prev,
+      theme_cake_price_tiers: (prev.theme_cake_price_tiers || []).filter((_, i) => i !== index),
+    }));
   };
 
   // Flavour row management inside cake form
@@ -247,13 +311,23 @@ const AdminThemeCakePage = () => {
       return;
     }
 
-    // Determine base_price from lowest egg or eggless price
-    let minPrice = Infinity;
-    cakeForm.flavours.forEach((f) => {
-      if (f.egg_price && f.egg_price < minPrice) minPrice = f.egg_price;
-      if (f.eggless_price && f.eggless_price < minPrice) minPrice = f.eggless_price;
-    });
-    if (minPrice === Infinity) minPrice = 500;
+    const defWeight = Number(cakeForm.theme_cake_default_weight) || 5;
+    const defPrice = Number(cakeForm.theme_cake_default_price) || 2000;
+    const stepSize = Number(cakeForm.theme_cake_step_size) || 1;
+
+    if (defWeight <= 0) {
+      showToast('Theme Cake base weight must be greater than 0 kg.', 'error');
+      return;
+    }
+    if (defPrice <= 0) {
+      showToast('Theme Cake base price must be greater than ₹0.', 'error');
+      return;
+    }
+
+    // Clean tiers and ensure valid weights
+    const cleanTiers = (cakeForm.theme_cake_price_tiers || [])
+      .filter((t) => Number(t.weight) > 0 && Number(t.price) > 0)
+      .map((t) => ({ weight: Number(t.weight), price: Number(t.price) }));
 
     const payload = {
       name: cakeForm.name,
@@ -262,10 +336,14 @@ const AdminThemeCakePage = () => {
       subcategory_id: cakeForm.subcategory_id,
       description: cakeForm.description,
       image_url: cakeForm.image_url,
-      weight: cakeForm.weight,
-      base_price: minPrice,
-      egg_price: cakeForm.flavours[0]?.egg_price || minPrice,
-      eggless_price: cakeForm.flavours[0]?.eggless_price || minPrice + 50,
+      weight: `${defWeight}kg`,
+      base_price: defPrice,
+      theme_cake_default_weight: defWeight,
+      theme_cake_default_price: defPrice,
+      theme_cake_step_size: stepSize,
+      theme_cake_price_tiers: cleanTiers,
+      egg_price: defPrice,
+      eggless_price: defPrice + 50,
       is_active: cakeForm.is_active,
       is_eggless: false,
       flavours: cakeForm.flavours,
@@ -592,7 +670,7 @@ const AdminThemeCakePage = () => {
                             <div className="flex items-center gap-3">
                               <div className="w-12 h-12 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 shrink-0">
                                 <img
-                                  src={cake.image_url || 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=100'}
+                                  src={formatImageUrl(cake.image_url, 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=100')}
                                   alt={cake.name}
                                   className="w-full h-full object-cover"
                                 />
@@ -725,7 +803,7 @@ const AdminThemeCakePage = () => {
                 >
                   <div className="relative h-40 bg-slate-100 overflow-hidden">
                     <img
-                      src={sub.image_url || 'https://images.unsplash.com/photo-1535141192574-5d4897c13136?w=600&q=80'}
+                      src={formatImageUrl(sub.image_url, 'https://images.unsplash.com/photo-1535141192574-5d4897c13136?w=600&q=80')}
                       alt={sub.name}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
@@ -844,14 +922,219 @@ const AdminThemeCakePage = () => {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Weight / Size Specification</label>
+                  <label className="text-xs font-bold text-slate-700">Display Weight Subtitle</label>
                   <input
                     type="text"
-                    placeholder="e.g. 1kg / 2-Tier Designer"
+                    placeholder="e.g. 5kg Base / Custom 3D Artisan Spec"
                     value={cakeForm.weight}
                     onChange={(e) => setCakeForm({ ...cakeForm, weight: e.target.value })}
                     className="w-full text-xs p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500"
                   />
+                </div>
+              </div>
+
+              {/* ======================================================= */}
+              {/* THEME CAKE DYNAMIC BASE WEIGHT & PRICING RULES */}
+              {/* ======================================================= */}
+              <div className="p-4 sm:p-5 bg-gradient-to-br from-amber-50/90 via-orange-50/40 to-amber-100/30 rounded-2xl border-2 border-amber-300 shadow-xs space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-amber-200">
+                  <div className="flex items-center gap-2">
+                    <Scale className="w-5 h-5 text-amber-700 shrink-0" />
+                    <div>
+                      <h3 className="font-serif font-bold text-sm sm:text-base text-chocolate flex items-center gap-2">
+                        <span>Theme Cake Starting Weight & Dynamic Pricing</span>
+                        <span className="text-[10px] font-bold bg-amber-500 text-chocolate px-2 py-0.5 rounded-full uppercase tracking-wider">
+                          Theme Rule
+                        </span>
+                      </h3>
+                      <p className="text-[11px] text-slate-600 mt-0.5">
+                        The customer weight selector starts strictly at this base weight and increments upward.
+                      </p>
+                    </div>
+                  </div>
+
+                  {Number(cakeForm.theme_cake_default_weight) > 0 && Number(cakeForm.theme_cake_default_price) > 0 && (
+                    <div className="text-xs font-bold text-amber-900 bg-white/90 border border-amber-300 px-3 py-1.5 rounded-xl shadow-2xs shrink-0 self-start sm:self-auto">
+                      Rate: <span className="text-chocolate">₹{Math.round(Number(cakeForm.theme_cake_default_price) / Number(cakeForm.theme_cake_default_weight))}/kg</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* 3 Config Inputs */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="bg-white p-3 rounded-xl border border-amber-200 shadow-2xs space-y-1">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-chocolate block">
+                      Base Starting Weight (kg) *
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min="0.5"
+                        step="0.5"
+                        required
+                        value={cakeForm.theme_cake_default_weight}
+                        onChange={(e) => setCakeForm({ ...cakeForm, theme_cake_default_weight: e.target.value })}
+                        className="w-full font-bold text-sm text-chocolate p-1.5 rounded-lg border border-slate-200 focus:outline-none focus:border-amber-500"
+                      />
+                      <span className="text-xs font-bold text-slate-400">kg</span>
+                    </div>
+                    <span className="text-[10px] text-slate-400 block">Lowest selectable weight (e.g. 5kg)</span>
+                  </div>
+
+                  <div className="bg-white p-3 rounded-xl border border-amber-200 shadow-2xs space-y-1">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-chocolate block">
+                      Base Price for Default Weight (₹) *
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-slate-400">₹</span>
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        required
+                        value={cakeForm.theme_cake_default_price}
+                        onChange={(e) => setCakeForm({ ...cakeForm, theme_cake_default_price: e.target.value })}
+                        className="w-full font-bold text-sm text-chocolate p-1.5 rounded-lg border border-slate-200 focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+                    <span className="text-[10px] text-slate-400 block">Price for starting weight (e.g. ₹2000)</span>
+                  </div>
+
+                  <div className="bg-white p-3 rounded-xl border border-amber-200 shadow-2xs space-y-1">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-chocolate block">
+                      Weight Step Increment (kg)
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min="0.1"
+                        step="0.5"
+                        value={cakeForm.theme_cake_step_size}
+                        onChange={(e) => setCakeForm({ ...cakeForm, theme_cake_step_size: e.target.value })}
+                        className="w-full font-bold text-sm text-chocolate p-1.5 rounded-lg border border-slate-200 focus:outline-none focus:border-amber-500"
+                      />
+                      <span className="text-xs font-bold text-slate-400">kg</span>
+                    </div>
+                    <span className="text-[10px] text-slate-400 block">Increment step (default 1kg: 5 $\rightarrow$ 6 $\rightarrow$ 7...)</span>
+                  </div>
+                </div>
+
+                {/* Optional Custom Price Tiers Overrides */}
+                <div className="space-y-2 pt-2 border-t border-amber-200/80">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div>
+                      <div className="text-xs font-bold text-chocolate flex items-center gap-1.5">
+                        <Calculator className="w-3.5 h-3.5 text-amber-700" />
+                        <span>Custom Price Tier Overrides (Optional)</span>
+                      </div>
+                      <p className="text-[10px] text-slate-500">
+                        Override the linear proportional price for specific weights (e.g. discounts for larger orders).
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAddTierRow}
+                      className="text-[11px] font-bold text-chocolate bg-amber-200 hover:bg-amber-300 px-3 py-1 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>Add Tier Override</span>
+                    </button>
+                  </div>
+
+                  {cakeForm.theme_cake_price_tiers?.length > 0 ? (
+                    <div className="space-y-1.5">
+                      {cakeForm.theme_cake_price_tiers.map((tier, tIdx) => (
+                        <div
+                          key={tIdx}
+                          className="flex items-center gap-2 bg-white p-2 rounded-xl border border-amber-100 shadow-2xs"
+                        >
+                          <div className="flex items-center gap-1.5 flex-1">
+                            <span className="text-xs text-slate-500 font-medium">Weight:</span>
+                            <input
+                              type="number"
+                              min="0.5"
+                              step="0.5"
+                              value={tier.weight}
+                              onChange={(e) => handleUpdateTierRow(tIdx, 'weight', e.target.value)}
+                              className="w-24 text-xs font-bold p-1 rounded-lg border border-slate-200 text-center"
+                            />
+                            <span className="text-xs font-bold text-slate-600">kg</span>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 flex-1">
+                            <span className="text-xs text-slate-500 font-medium">Override Price:</span>
+                            <span className="text-xs font-bold text-slate-400">₹</span>
+                            <input
+                              type="number"
+                              min="1"
+                              step="10"
+                              value={tier.price}
+                              onChange={(e) => handleUpdateTierRow(tIdx, 'price', e.target.value)}
+                              className="w-28 text-xs font-bold p-1 rounded-lg border border-slate-200 text-center text-chocolate"
+                            />
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveTierRow(tIdx)}
+                            className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                            title="Delete tier"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-[11px] text-slate-500 italic bg-white/60 p-2.5 rounded-xl border border-dashed border-amber-200">
+                      No custom overrides added. All weight options will automatically calculate proportionally: <span className="font-mono text-chocolate font-bold">(Base Price / Base Weight) × Selected Weight</span>.
+                    </div>
+                  )}
+                </div>
+
+                {/* Live Customer Price Preview Card */}
+                <div className="p-3 bg-white rounded-xl border border-amber-200 shadow-2xs space-y-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                    Customer Experience Preview (What the customer will see):
+                  </span>
+                  <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                    {(() => {
+                      const defW = Number(cakeForm.theme_cake_default_weight) || 5;
+                      const defP = Number(cakeForm.theme_cake_default_price) || 2000;
+                      const step = Number(cakeForm.theme_cake_step_size) || 1;
+                      const rate = defW > 0 ? defP / defW : 0;
+                      const previewWeights = [defW, defW + step, defW + step * 2, defW + step * 3, defW + step * 4];
+
+                      return previewWeights.map((w, idx) => {
+                        const customTier = (cakeForm.theme_cake_price_tiers || []).find(
+                          (t) => Math.abs(Number(t.weight) - w) < 0.01
+                        );
+                        const price = customTier ? Number(customTier.price) : Math.round(rate * w);
+                        const isBase = idx === 0;
+
+                        return (
+                          <div
+                            key={w}
+                            className={`px-3 py-2 rounded-xl border text-center shrink-0 min-w-[95px] ${
+                              isBase
+                                ? 'bg-amber-500 text-chocolate border-amber-600 font-bold shadow-xs'
+                                : customTier
+                                ? 'bg-orange-50 border-orange-300 text-chocolate'
+                                : 'bg-slate-50 border-slate-200 text-slate-700'
+                            }`}
+                          >
+                            <div className="text-xs font-black">{w}kg</div>
+                            <div className="text-xs font-bold mt-0.5">₹{price.toLocaleString('en-IN')}</div>
+                            <span className={`text-[9px] px-1.5 py-0.2 rounded-full inline-block mt-0.5 font-semibold ${
+                              isBase ? 'bg-chocolate/20 text-chocolate' : customTier ? 'bg-orange-200 text-orange-900' : 'text-slate-400'
+                            }`}>
+                              {isBase ? 'Base' : customTier ? 'Override' : 'Proportional'}
+                            </span>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
                 </div>
               </div>
 
@@ -879,7 +1162,7 @@ const AdminThemeCakePage = () => {
                 </div>
                 {cakeForm.image_url && (
                   <div className="w-24 h-24 rounded-xl overflow-hidden border border-amber-200 mt-2 bg-slate-50">
-                    <img src={cakeForm.image_url} alt="Preview" className="w-full h-full object-cover" />
+                    <img src={formatImageUrl(cakeForm.image_url)} alt="Preview" className="w-full h-full object-cover" />
                   </div>
                 )}
               </div>
@@ -1100,7 +1383,7 @@ const AdminThemeCakePage = () => {
                 </div>
                 {subForm.image_url && (
                   <div className="w-20 h-20 rounded-xl overflow-hidden border border-amber-200 bg-slate-50">
-                    <img src={subForm.image_url} alt="Preview" className="w-full h-full object-cover" />
+                    <img src={formatImageUrl(subForm.image_url)} alt="Preview" className="w-full h-full object-cover" />
                   </div>
                 )}
               </div>

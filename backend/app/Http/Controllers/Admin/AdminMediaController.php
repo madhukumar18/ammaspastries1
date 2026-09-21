@@ -29,7 +29,7 @@ class AdminMediaController extends Controller
         // Store in storage/app/public/uploads/{folder}
         $path = $file->storeAs("uploads/{$folder}", $fileName, 'public');
 
-        $url = asset("storage/{$path}");
+        $url = "/storage/{$path}";
 
         return response()->json([
             'success' => true,

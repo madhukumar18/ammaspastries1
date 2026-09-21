@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { Heart, ShoppingBag, Trash2, ArrowLeft } from 'lucide-react';
+import { formatImageUrl } from '../../utils/imageUrl';
 
 const WishlistPage = () => {
   const { wishlist, toggleWishlist, addToCart } = useApp();
@@ -54,7 +55,7 @@ const WishlistPage = () => {
               className="bg-white rounded-3xl p-4 border border-amber-100 shadow-xs flex flex-col justify-between"
             >
               <div className="relative aspect-square w-full rounded-2xl overflow-hidden bg-cream mb-3">
-                <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
+                <img src={formatImageUrl(item.image_url)} alt={item.name} className="w-full h-full object-cover" />
                 <button
                   onClick={() => toggleWishlist(item)}
                   className="absolute top-2.5 right-2.5 w-8 h-8 rounded-full bg-white/80 backdrop-blur-xs text-rose-600 flex items-center justify-center hover:bg-white transition-colors"

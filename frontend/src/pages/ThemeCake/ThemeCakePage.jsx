@@ -16,14 +16,17 @@ import {
   Image as ImageIcon,
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
+import { formatImageUrl } from '../../utils/imageUrl';
 
 // Theme Cake Card
 const ThemeCakeCard = ({ product }) => {
   const navigate = useNavigate();
 
-  // Determine starting price from flavors or base price
+  // Determine starting price from theme cake default price, flavors or base price
   let startingPrice = product.base_price || 0;
-  if (product.flavours && Array.isArray(product.flavours) && product.flavours.length > 0) {
+  if (product.theme_cake_default_price && Number(product.theme_cake_default_price) > 0) {
+    startingPrice = Number(product.theme_cake_default_price);
+  } else if (product.flavours && Array.isArray(product.flavours) && product.flavours.length > 0) {
     const validPrices = product.flavours
       .flatMap((f) => [f.egg_price, f.eggless_price])
       .filter((p) => p !== undefined && p !== null && !isNaN(Number(p)) && Number(p) > 0);
@@ -43,7 +46,7 @@ const ThemeCakeCard = ({ product }) => {
       <div className="relative aspect-square overflow-hidden bg-amber-50/50">
         {product.image_url ? (
           <img
-            src={product.image_url}
+            src={formatImageUrl(product.image_url)}
             alt={product.name}
             className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-500 ease-out"
           />
@@ -68,6 +71,12 @@ const ThemeCakeCard = ({ product }) => {
           )}
         </div>
 
+        {product.theme_cake_default_weight && (
+          <span className="absolute top-2.5 right-2.5 text-[10px] font-black bg-amber-500 text-chocolate px-2.5 py-0.5 rounded-full shadow-xs">
+            Min {product.theme_cake_default_weight}kg
+          </span>
+        )}
+
         {flavorCount > 0 && (
           <span className="absolute bottom-2.5 left-2.5 text-[10px] font-bold bg-chocolate/85 backdrop-blur-xs text-amber-200 px-2.5 py-0.5 rounded-full shadow-xs">
             {flavorCount} {flavorCount === 1 ? 'Flavor' : 'Flavors'} Available
@@ -90,7 +99,9 @@ const ThemeCakeCard = ({ product }) => {
 
         <div className="pt-2 border-t border-amber-50 flex items-center justify-between mt-auto">
           <div>
-            <span className="text-[10px] text-slate-400 font-medium block">Starting from</span>
+            <span className="text-[10px] text-slate-400 font-medium block">
+              {product.theme_cake_default_weight ? `Starting from (${product.theme_cake_default_weight}kg Base)` : 'Starting from'}
+            </span>
             <span className="text-base sm:text-lg font-black text-amber-800">
               ₹{Number(startingPrice).toLocaleString('en-IN')}
             </span>
@@ -128,7 +139,7 @@ const ThemeSubcategoryCard = ({ subcategory, isSelected, onClick }) => (
     <div className="aspect-[4/3] w-full overflow-hidden bg-amber-50/60 relative">
       {subcategory.image_url ? (
         <img
-          src={subcategory.image_url}
+          src={formatImageUrl(subcategory.image_url)}
           alt={subcategory.name}
           className={`w-full h-full object-cover transition-transform duration-700 ease-out ${
             isSelected ? 'scale-108' : 'group-hover:scale-108'

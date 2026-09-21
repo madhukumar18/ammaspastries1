@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import api from '../../services/api';
 import ProductCarousel from '../../components/UI/ProductCarousel';
+import { formatImageUrl } from '../../utils/imageUrl';
 import {
   Trash2,
   Heart,
@@ -148,10 +149,11 @@ const CartPage = () => {
           {cart.map((item) => {
             const hasCustomization = Boolean(item.customization);
             const isPhotoCake = item.customization?.is_photo_cake;
-            const itemImage =
+            const itemImage = formatImageUrl(
               item.customization?.photo_preview_url ||
-              item.product.image_url ||
-              'https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=200';
+              item.product.image_url,
+              'https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=200'
+            );
 
             return (
               <div

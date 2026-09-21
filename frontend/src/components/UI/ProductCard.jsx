@@ -2,10 +2,11 @@ import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Heart, Star, ShoppingBag, Zap } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { formatImageUrl } from '../../utils/imageUrl';
 
 const ProductCard = ({ product, onAddToCart, onOrderNow }) => {
   const navigate = useNavigate();
-  const { addToCart, toggleWishlist, isInWishlist } = useApp();
+  const { cart, addToCart, updateCartQuantity, removeFromCart, toggleWishlist, isInWishlist } = useApp();
 
   const isFavorited = isInWishlist(product.id);
 
@@ -27,27 +28,159 @@ const ProductCard = ({ product, onAddToCart, onOrderNow }) => {
     }
   }
 
+  const isThemeCake = Boolean(
+    product.category?.slug === 'theme-cakes' ||
+    product.category_id === 8 ||
+    product.category?.name?.toLowerCase().includes('theme cake') ||
+    (product.theme_cake_default_weight && Number(product.theme_cake_default_weight) > 0)
+  );
+
+  const isDessert = Boolean(
+    product.category?.slug === 'dessert' ||
+    product.category_id === 3 ||
+    product.category?.name?.toLowerCase().includes('dessert') ||
+    (product.dessert_min_quantity && Number(product.dessert_min_quantity) > 0)
+  );
+
+  const isDryFruit = Boolean(
+    product.category?.slug === 'dry-fruits' ||
+    product.category_id === 4 ||
+    product.category?.name?.toLowerCase().includes('dry fruit') ||
+    (Array.isArray(product.dry_fruit_pack_options) && product.dry_fruit_pack_options.length > 0)
+  );
+
+  let dryFruitStartingPrice = null;
+  let firstDryFruitPackLabel = null;
+  if (isDryFruit) {
+    let packs = product.dry_fruit_pack_options;
+    if (typeof packs === 'string') {
+      try { packs = JSON.parse(packs); } catch (e) { packs = []; }
+    }
+    if (Array.isArray(packs) && packs.length > 0) {
+      const prices = packs.map((p) => Number(p.price)).filter((pr) => pr > 0);
+      if (prices.length > 0) {
+        dryFruitStartingPrice = Math.min(...prices);
+      }
+      firstDryFruitPackLabel = packs[0].label || `${packs[0].weight}${packs[0].unit || 'g'}`;
+    }
+  }
+
+  const isSnack = Boolean(
+    product.category?.slug === 'snacks' ||
+    product.category?.name?.toLowerCase().includes('snack') ||
+    Boolean(product.snack_variants)
+  );
+
   const primaryPrice = snackStartingPrice !== null
     ? snackStartingPrice
+    : dryFruitStartingPrice !== null
+    ? dryFruitStartingPrice
+    : isDessert && (product.dessert_default_price && Number(product.dessert_default_price) > 0)
+    ? Number(product.dessert_default_price)
+    : (product.theme_cake_default_price && Number(product.theme_cake_default_price) > 0)
+    ? Number(product.theme_cake_default_price)
     : (product.discount_price || product.base_price || product.price || 0);
-  const originalPrice = snackStartingPrice !== null ? null : (product.discount_price ? product.base_price : null);
+  const originalPrice = snackStartingPrice !== null || dryFruitStartingPrice !== null ? null : (product.discount_price ? product.base_price : null);
 
   // Selected default variant if available
   const defaultVariant = product.variants && product.variants.length > 0 ? product.variants[0] : null;
 
-  const requiresCustomization = Boolean(
-    (product.snack_variants?.pricing_type === 'both') ||
-    (product.cupcake_variants?.matrix && product.cupcake_variants.matrix.length > 0) ||
-    (product.category?.slug === 'theme-cakes' && product.flavours?.length > 0)
-  );
+  // Cart status for this product
+  const cartItems = (cart || []).filter((item) => item.product?.id === product.id);
+  const totalCartQty = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+  const primaryCartItem = cartItems[0] || null;
 
   const handleAddToCart = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    if (requiresCustomization) {
+
+    // Theme Cakes and Cupcakes require custom configuration
+    if (isThemeCake || (product.cupcake_variants?.matrix && product.cupcake_variants.matrix.length > 0)) {
       navigate(`/cakes/${product.slug}`);
       return;
     }
+
+    // Quick Add for Desserts directly to cart
+    if (isDessert) {
+      const minQty = Math.max(1, parseInt(product.dessert_min_quantity || 2, 10));
+      const defPrice = Number(product.dessert_default_price || product.base_price || 100);
+      const chosenVariant = {
+        id: `dessert-${product.id}-${minQty}`,
+        size_weight: `${minQty} Pcs`,
+        price: defPrice,
+        discount_price: null,
+      };
+      addToCart(product, chosenVariant, 1, {
+        product_type: 'dessert',
+        selected_price: defPrice,
+        selected_weight_portion: `${minQty} Pcs`,
+        dessert_quantity: minQty,
+        order_type: 'piece',
+      });
+      return;
+    }
+
+    // Quick Add for Snacks directly to cart
+    if (isSnack && product.snack_variants) {
+      const svData = product.snack_variants;
+      const unit = (svData.pricing_type === 'weight' && !svData.piece) ? 'weight' : 'piece';
+      const unitData = unit === 'piece' ? svData.piece : svData.weight;
+      const eggless = unitData?.eggless_price !== undefined && unitData?.eggless_price !== null && unitData?.eggless_price !== '';
+      const price = eggless ? Number(unitData.eggless_price) : Number(unitData?.egg_price || product.base_price || 0);
+      const portionLabel = unit === 'piece' ? '1 Piece' : `${unitData?.value || ''} (${unitData?.unit || 'grams'})`.trim();
+      const dietaryLabel = eggless ? '100% Pure Eggless' : 'With Egg';
+      const chosenVariant = {
+        id: `snack-${product.id}-${unit}-${eggless ? 'eggless' : 'egg'}`,
+        size_weight: portionLabel,
+        price: price,
+        discount_price: null,
+      };
+      addToCart(product, chosenVariant, 1, {
+        product_type: 'snack',
+        unit_type: unit,
+        portion_label: portionLabel,
+        is_eggless: eggless,
+        dietary: dietaryLabel,
+        selected_price: price,
+        selected_weight_portion: `${portionLabel} • ${dietaryLabel}`,
+        snack_quantity: 1,
+      });
+      return;
+    }
+
+    // Quick Add for Dry Fruits directly to cart (defaults to 1st pack option)
+    if (isDryFruit) {
+      let packs = product.dry_fruit_pack_options;
+      if (typeof packs === 'string') {
+        try { packs = JSON.parse(packs); } catch (e) { packs = []; }
+      }
+      const activePack = Array.isArray(packs) && packs.length > 0 ? packs[0] : {
+        weight: 200,
+        unit: 'g',
+        label: product.weight || '200g',
+        price: primaryPrice,
+      };
+      const packPrice = Number(activePack.price);
+      const chosenVariant = {
+        id: `dryfruit-${product.id}-${activePack.label || `${activePack.weight}${activePack.unit || 'g'}`}`,
+        size_weight: `${activePack.label || `${activePack.weight}${activePack.unit || 'g'}`} Pack`,
+        price: packPrice,
+        discount_price: null,
+      };
+      addToCart(product, chosenVariant, 1, {
+        product_type: 'dry_fruit',
+        pack_size: activePack.weight,
+        unit: activePack.unit || 'g',
+        pack_label: activePack.label || `${activePack.weight}${activePack.unit || 'g'}`,
+        price_per_pack: packPrice,
+        number_of_packs: 1,
+        selected_price: packPrice,
+        selected_weight_portion: `1 × ${activePack.label || `${activePack.weight}${activePack.unit || 'g'}`} Pack`,
+        order_type: 'pack',
+      });
+      return;
+    }
+
     if (onAddToCart) {
       onAddToCart(product, defaultVariant, 1);
     } else {
@@ -58,14 +191,16 @@ const ProductCard = ({ product, onAddToCart, onOrderNow }) => {
   const handleOrderNow = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    if (requiresCustomization) {
+
+    if (isThemeCake || (product.cupcake_variants?.matrix && product.cupcake_variants.matrix.length > 0)) {
       navigate(`/cakes/${product.slug}`);
       return;
     }
+
     if (onOrderNow) {
       onOrderNow(product, defaultVariant, 1);
     } else {
-      addToCart(product, defaultVariant, 1);
+      handleAddToCart(e);
       navigate('/checkout');
     }
   };
@@ -83,7 +218,7 @@ const ProductCard = ({ product, onAddToCart, onOrderNow }) => {
       <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-cream mb-2">
         <Link to={`/cakes/${product.slug}`}>
           <img
-            src={product.image_url || 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=500'}
+            src={formatImageUrl(product.image_url, 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=500')}
             alt={product.name}
             loading="lazy"
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
@@ -130,9 +265,13 @@ const ProductCard = ({ product, onAddToCart, onOrderNow }) => {
         </button>
 
         {/* Weight / Size hint badge */}
-        {product.weight && (
+        {(product.weight || isDessert || isDryFruit) && (
           <div className="absolute bottom-1.5 left-1.5 bg-black/50 backdrop-blur-xs text-white text-[9px] font-medium px-1.5 py-0.5 rounded">
-            {product.weight}
+            {isDessert
+              ? (product.dessert_min_quantity ? `${product.dessert_min_quantity} Pcs` : (product.weight && product.weight.includes('Pc') ? product.weight : '2 Pcs'))
+              : isDryFruit
+              ? (firstDryFruitPackLabel || product.weight || 'Pack')
+              : product.weight}
           </div>
         )}
       </div>
@@ -182,6 +321,14 @@ const ProductCard = ({ product, onAddToCart, onOrderNow }) => {
                 <span className="text-[9px] text-slate-400 font-medium">
                   • {sv.pricing_type === 'both' ? 'Piece & Weight' : sv.pricing_type === 'piece' ? 'By Piece' : `${sv.weight?.value || ''} ${sv.weight?.unit || 'Weight'}`.trim()}
                 </span>
+              ) : isDryFruit ? (
+                <span className="text-[9px] text-emerald-700 font-medium">
+                  • Pack: {firstDryFruitPackLabel || product.weight || '200g'}
+                </span>
+              ) : isDessert ? (
+                <span className="text-[9px] text-slate-400 font-medium">
+                  • Min {product.dessert_min_quantity ? `${product.dessert_min_quantity} Pcs` : (product.weight && product.weight.includes('Pc') ? product.weight : '2 Pcs')}
+                </span>
               ) : product.weight ? (
                 <span className="text-[9px] text-slate-400 font-medium">• Min {product.weight}</span>
               ) : defaultVariant?.size_weight ? (
@@ -193,28 +340,75 @@ const ProductCard = ({ product, onAddToCart, onOrderNow }) => {
           </div>
         </div>
 
-        {/* Dual Action Buttons: Add to Cart + Order Now */}
-        <div className="mt-2 grid grid-cols-2 gap-1.5">
-          <button
-            type="button"
-            onClick={handleAddToCart}
-            className="flex items-center justify-center gap-1 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300/90 font-bold text-[11px] py-2 px-1 rounded-lg transition-all active:scale-95 shadow-2xs cursor-pointer min-h-[38px]"
-            title="Add item to cart"
-          >
-            <ShoppingBag className="w-3.5 h-3.5 text-amber-700 shrink-0" />
-            <span>Add</span>
-          </button>
+        {/* Dual Action Buttons / In-Cart Quantity Stepper with + Mark */}
+        {totalCartQty > 0 ? (
+          <div className="mt-2 flex items-center justify-between bg-amber-50 border-2 border-amber-400 rounded-xl p-1 shadow-2xs">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (primaryCartItem) {
+                  if (primaryCartItem.quantity <= 1) {
+                    removeFromCart(primaryCartItem.id);
+                  } else {
+                    updateCartQuantity(primaryCartItem.id, primaryCartItem.quantity - 1);
+                  }
+                }
+              }}
+              className="w-8 h-8 flex items-center justify-center bg-white hover:bg-rose-50 text-chocolate hover:text-rose-700 rounded-lg font-black text-base shadow-xs active:scale-95 transition-all cursor-pointer border border-amber-200"
+              title="Decrease quantity (−)"
+            >
+              −
+            </button>
 
-          <button
-            type="button"
-            onClick={handleOrderNow}
-            className="flex items-center justify-center gap-1 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-700 hover:to-amber-600 text-white font-bold text-[11px] py-2 px-1 rounded-lg shadow-xs hover:shadow-md transition-all active:scale-95 cursor-pointer min-h-[38px]"
-            title="Order directly"
-          >
-            <Zap className="w-3.5 h-3.5 fill-amber-200 text-amber-200 shrink-0" />
-            <span>Order</span>
-          </button>
-        </div>
+            <div className="text-center px-1">
+              <span className="font-extrabold text-xs text-chocolate block leading-none">
+                {totalCartQty} in Cart
+              </span>
+              <span className="text-[10px] text-amber-800 font-bold">
+                ₹{((primaryCartItem?.price || primaryPrice) * totalCartQty).toLocaleString('en-IN')}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (primaryCartItem) {
+                  updateCartQuantity(primaryCartItem.id, primaryCartItem.quantity + 1);
+                }
+              }}
+              className="w-8 h-8 flex items-center justify-center bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-600 hover:to-amber-500 text-chocolate rounded-lg font-black text-base shadow-xs active:scale-95 transition-all cursor-pointer"
+              title="Add more (+)"
+            >
+              +
+            </button>
+          </div>
+        ) : (
+          <div className="mt-2 grid grid-cols-2 gap-1.5">
+            <button
+              type="button"
+              onClick={handleAddToCart}
+              className="flex items-center justify-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300/90 font-bold text-xs py-2 px-1 rounded-xl transition-all active:scale-95 shadow-2xs cursor-pointer min-h-[38px]"
+              title="Add item to cart (+)"
+            >
+              <span className="text-base font-black text-amber-800 leading-none">+</span>
+              <span>Add</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleOrderNow}
+              className="flex items-center justify-center gap-1 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-700 hover:to-amber-600 text-white font-bold text-[11px] py-2 px-1 rounded-xl shadow-xs hover:shadow-md transition-all active:scale-95 cursor-pointer min-h-[38px]"
+              title="Order directly"
+            >
+              <Zap className="w-3.5 h-3.5 fill-amber-200 text-amber-200 shrink-0" />
+              <span>Order</span>
+            </button>
+          </div>
+        )}
       </div>
 
     </div>

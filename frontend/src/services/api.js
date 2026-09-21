@@ -1,6 +1,18 @@
 import axios from 'axios';
 
-const API_BASE_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || 'http://127.0.0.1:8000/api';
+// On external/tunnel hostnames, always use relative '/api' to proxy through Vite.
+// Even on localhost, relative '/api' is preferred because Vite proxies it to port 8000.
+const isRemoteHost =
+  typeof window !== 'undefined' &&
+  window.location.hostname !== 'localhost' &&
+  window.location.hostname !== '127.0.0.1';
+
+let API_BASE_URL = '/api';
+if (!isRemoteHost) {
+  API_BASE_URL =
+    (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) ||
+    '/api';
+}
 
 const api = axios.create({
   baseURL: API_BASE_URL,

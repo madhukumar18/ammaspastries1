@@ -5,12 +5,16 @@ frontend/node_modules/
 node_modules/
 
 # Environment files
+.env
+.env.*
+!.env.example
+*.env
 backend/.env
-backend/.env.backup
-backend/.env.production
+backend/.env.*
+!backend/.env.example
 frontend/.env
-frontend/.env.local
-frontend/.env.*.local
+frontend/.env.*
+!frontend/.env.example
 
 # Build output
 frontend/dist/

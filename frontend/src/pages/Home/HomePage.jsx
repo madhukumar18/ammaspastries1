@@ -4,6 +4,7 @@ import api from '../../services/api';
 import ProductCard from '../../components/UI/ProductCard';
 import CategoryImagesCarousel from '../../components/UI/CategoryImagesCarousel';
 import FloatingCakePieces from '../../components/UI/FloatingCakePieces';
+import { formatImageUrl } from '../../utils/imageUrl';
 import { ProductCardSkeleton, BannerSkeleton } from '../../components/UI/SkeletonLoader';
 import {
   ChevronLeft,
@@ -193,10 +194,10 @@ const HomePage = () => {
                 >
                   <picture className="w-full h-full block">
                     {banner.mobile_image_url && (
-                      <source media="(max-width: 640px)" srcSet={banner.mobile_image_url} />
+                      <source media="(max-width: 640px)" srcSet={formatImageUrl(banner.mobile_image_url)} />
                     )}
                     <img
-                      src={banner.image_url}
+                      src={formatImageUrl(banner.image_url)}
                       alt={banner.title}
                       className="w-full h-full object-cover object-[center_28%] sm:object-[center_22%]"
                     />

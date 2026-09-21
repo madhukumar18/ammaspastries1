@@ -191,7 +191,7 @@ const AdminSecurityLogsPage = () => {
   // Download raw security.log
   const handleDownload = () => {
     const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
-    const baseUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
+    const baseUrl = import.meta.env.VITE_API_URL || '/api';
     const downloadUrl = `${baseUrl}/admin/security-logs/download`;
 
     // Fetch as blob with Authorization header

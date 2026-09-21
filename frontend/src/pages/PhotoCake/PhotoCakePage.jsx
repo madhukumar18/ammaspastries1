@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import { useApp } from '../../context/AppContext';
+import { formatImageUrl } from '../../utils/imageUrl';
 import {
   Upload,
   Sparkles,
@@ -548,7 +549,7 @@ const PhotoCakePage = () => {
                   >
                     <div className="relative aspect-video sm:aspect-square w-full rounded-xl overflow-hidden mb-2 bg-cream">
                       <img
-                        src={shape.image}
+                        src={formatImageUrl(shape.image)}
                         alt={shape.name}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                         onError={(e) => {
