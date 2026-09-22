@@ -41,10 +41,11 @@ export default {
         },
       },
       fontFamily: {
-        serif: ['"Playfair Display"', 'Georgia', 'serif'],
+        serif: ['"Bricolage Grotesque"', 'system-ui', 'sans-serif'],
+        bricolage: ['"Bricolage Grotesque"', 'system-ui', 'sans-serif'],
+        heading: ['"Bricolage Grotesque"', 'system-ui', 'sans-serif'],
+        banner: ['"Bricolage Grotesque"', 'system-ui', 'sans-serif'],
         sans: ['"Inter"', 'system-ui', 'sans-serif'],
-        banner: ['"Bricolage Grotesque"', 'sans-serif'],
-        bricolage: ['"Bricolage Grotesque"', 'sans-serif'],
       },
       boxShadow: {
         'warm': '0 10px 25px -5px rgba(61, 35, 20, 0.08), 0 8px 10px -6px rgba(61, 35, 20, 0.04)',

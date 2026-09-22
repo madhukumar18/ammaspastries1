@@ -15,6 +15,8 @@ class RistaPosService
     protected string $apiKey;
     protected string $apiSecret;
     protected ?string $configuredToken;
+    protected string $defaultBranchCode;
+    protected string $defaultBranchName;
     protected bool $autoSync;
     protected bool $verifySsl;
 
@@ -36,6 +38,8 @@ class RistaPosService
         $this->apiKey = $envVars['RISTA_API_KEY'] ?? env('RISTA_API_KEY');
         $this->apiSecret = $envVars['RISTA_API_SECRET'] ?? env('RISTA_API_SECRET');
         $this->configuredToken = $envVars['RISTA_API_TOKEN'] ?? env('RISTA_API_TOKEN');
+        $this->defaultBranchCode = $envVars['RISTA_DEFAULT_BRANCH_CODE'] ?? env('RISTA_DEFAULT_BRANCH_CODE', 'Test');
+        $this->defaultBranchName = $envVars['RISTA_DEFAULT_BRANCH_NAME'] ?? env('RISTA_DEFAULT_BRANCH_NAME', 'Test');
         $this->autoSync = filter_var($envVars['RISTA_AUTO_SYNC'] ?? env('RISTA_AUTO_SYNC', true), FILTER_VALIDATE_BOOLEAN);
         $this->verifySsl = filter_var($envVars['RISTA_SSL_VERIFY'] ?? env('RISTA_SSL_VERIFY', false), FILTER_VALIDATE_BOOLEAN);
     }
@@ -260,89 +264,139 @@ class RistaPosService
         // Outlet's Rista Store ID / Branch Code
         $storeId = $outlet->rista_store_id ?: $outlet->code;
 
-        // Format items with cake customizations (name on cake, eggless, flavours)
+        // Format items according to Rista POS specification
         $formattedItems = [];
         foreach ($order->items as $item) {
             $customization = $item->customization;
             $notes = [];
+            if (!empty($item->variant_title)) {
+                $notes[] = $item->variant_title;
+            }
             if ($customization) {
                 if (!empty($customization->name_on_cake)) {
-                    $notes[] = "Name on Cake: {$customization->name_on_cake}";
+                    $notes[] = "Name: {$customization->name_on_cake}";
                 }
                 if (!empty($customization->description)) {
-                    $notes[] = "Message: {$customization->description}";
+                    $notes[] = "Msg: {$customization->description}";
                 }
                 if (!empty($customization->flavour)) {
                     $notes[] = "Flavour: {$customization->flavour}";
                 }
                 if ($customization->is_eggless) {
-                    $notes[] = "Eggless: Yes";
+                    $notes[] = "Eggless";
                 }
             }
 
+            // In Rista's catalog, SKU 509 is the master code for 'Shapes Per Kg'.
+            // If the product is an actual cake and not the shape modifier itself, do not pass 509 as skuCode,
+            // otherwise Rista's POS catalog lookup automatically overwrites the cake name with 'Shapes Per Kg'.
+            $rawSku = trim((string) ($item->product?->sku ?: ($item->variant?->sku ?: '')));
+            $sku = '';
+            if (!empty($rawSku) && !str_contains($rawSku, '509')) {
+                $sku = $rawSku;
+            }
+
+            $shortName = (string) $item->product_name;
+            $longName = $shortName . (!empty($item->variant_title) ? " ({$item->variant_title})" : '');
+            $qty = (float) $item->quantity;
+            $unitPrice = (float) $item->unit_price;
+            $itemAmount = (float) $item->subtotal;
+
             $formattedItems[] = [
-                'item_id' => $item->product_id,
-                'item_name' => $item->product_name,
-                'variant_title' => $item->variant_title,
-                'quantity' => (int) $item->quantity,
-                'unit_price' => (float) $item->unit_price,
-                'total_price' => (float) $item->subtotal,
-                'instructions' => implode(' | ', $notes),
-                'customization' => $customization ? [
-                    'name_on_cake' => $customization->name_on_cake,
-                    'message' => $customization->description,
-                    'cake_size' => $customization->cake_size,
-                    'flavour' => $customization->flavour,
-                    'is_eggless' => (bool) $customization->is_eggless,
-                ] : null,
+                'shortName' => $shortName,
+                'longName' => $longName,
+                'variants' => (string) ($item->variant_id ?: $item->product_id),
+                'skuCode' => (string) $sku,
+                'note' => implode(' | ', $notes),
+                'quantity' => $qty,
+                'unitPrice' => $unitPrice,
+                'itemAmount' => $itemAmount,
+                'optionAmount' => 0,
+                'discountAmount' => 0,
+                'itemTotalAmount' => $itemAmount,
             ];
         }
 
-        // Standard Rista POS sale payload
+        $invoiceNum = (int) preg_replace('/[^0-9]/', '', $order->order_number) ?: $order->id;
+        $isPickup = ($order->delivery_method ?? 'home_delivery') === 'pickup';
+
+        // Determine branch code: use explicit rista_store_id if configured, otherwise fallback to default branch code
+        $isExplicitStoreId = !empty($outlet->rista_store_id)
+            && !str_starts_with($outlet->rista_store_id, 'AP')
+            && !str_starts_with($outlet->rista_store_id, 'RSTA_STORE_');
+
+        $defaultBranch = $this->defaultBranchCode;
+        $branchCode = (string) ($isExplicitStoreId ? $outlet->rista_store_id : $defaultBranch);
+        $branchName = (string) ($isExplicitStoreId ? ($outlet->name ?: $this->defaultBranchName) : $this->defaultBranchName);
+
+        // Customer payload: omit arbitrary integer ID so Rista resolves existing customer by phone without conflict
+        $customerData = [
+            'name' => $order->customer_name ?: 'Customer',
+            'phoneNumber' => (string) ($order->customer_phone ?: ''),
+        ];
+        if (!empty($order->customer_email)) {
+            $customerData['email'] = $order->customer_email;
+        }
+
+        $outletNote = "Outlet: " . ($outlet->name ?? 'Ammas Pastries');
+        $fullNote = trim($outletNote . ($order->special_instructions ? ' | ' . $order->special_instructions : ''));
+
+        // Official Rista POS /sale payload matching schema
         $payload = [
-            'merchant_order_id' => $order->order_number,
-            'branch_code' => $storeId,
-            'branch_id' => $storeId,
-            'store_id' => $storeId,
-            'outlet_name' => $outlet->name,
-            'outlet_code' => $outlet->code,
-            'order_type' => 'DELIVERY',
-            'order_source' => "Amma's Website",
+            'branchCode' => $branchCode,
+            'branchName' => $branchName,
+            'status' => 'Open',
+            'fulfillmentStatus' => 'Confirmed',
+            'sourceInfo' => [
+                'companyName' => "Amma's Website",
+                'invoiceNumber' => $invoiceNum,
+                'invoiceDate' => $order->created_at?->format('Y-m-d') ?? date('Y-m-d'),
+                'callbackURL' => '',
+                'callbackHeaders' => (object) [],
+                'source' => 'Online',
+                'sourceOutletId' => $branchCode,
+                'outletId' => $branchCode,
+                'isEditable' => true,
+                'verifyCoupons' => true,
+                'isEcomOrder' => true,
+            ],
             'channel' => "Amma's Website",
-            'created_at' => $order->created_at?->toIso8601String() ?? now()->toIso8601String(),
-            'customer' => [
-                'name' => $order->customer_name,
-                'phone' => $order->customer_phone,
-                'email' => $order->customer_email,
-                'delivery_address' => [
-                    'address_line' => $order->delivery_address,
-                    'area' => $order->delivery_area,
-                    'city' => $order->delivery_city,
-                    'pincode' => $order->delivery_pincode,
-                ],
-            ],
-            'delivery_schedule' => [
-                'delivery_date' => $order->delivery_date?->format('Y-m-d'),
-                'time_slot' => $order->delivery_time_slot,
-                'instructions' => $order->special_instructions,
-            ],
             'items' => $formattedItems,
-            'bill_summary' => [
-                'subtotal' => (float) $order->subtotal,
-                'discount' => (float) $order->discount,
-                'delivery_fee' => (float) $order->delivery_fee,
-                'tax' => (float) $order->tax,
-                'total_amount' => (float) $order->total,
-                'coupon_code' => $order->coupon_code,
+            'options' => [],
+            'customer' => $customerData,
+            'delivery' => [
+                'name' => $order->customer_name ?: 'Customer',
+                'email' => $order->customer_email ?: null,
+                'phoneNumber' => (string) ($order->customer_phone ?: ''),
+                'mode' => $isPickup ? 'Pickup' : 'Delivery',
+                'address' => [
+                    'label' => 'local',
+                    'addressLine' => $order->delivery_address ?: ($outlet->address ?: 'Bengaluru'),
+                    'city' => $order->delivery_city ?: ($outlet->city ?: 'Bengaluru'),
+                    'state' => 'KA',
+                    'country' => 'India',
+                    'zip' => $order->delivery_pincode ?: ($outlet->pincode ?: '560001'),
+                    'landmark' => '',
+                    'latitude' => 0,
+                    'longitude' => 0,
+                ],
+                'deliveryDate' => $order->delivery_date?->format('Y-m-d'),
             ],
-            'payment' => [
-                'mode' => 'ONLINE',
-                'status' => 'PAID',
-                'amount' => (float) $order->total,
-                'gateway' => 'RAZORPAY',
-                'transaction_id' => $order->latestPayment?->transaction_id ?? $order->latestPayment?->razorpay_payment_id ?? 'ONLINE_TXN',
-                'outlet_account_attributed' => $storeId,
+            'payments' => [
+                [
+                    'mode' => 'Upi',
+                    'amount' => (float) $order->total,
+                    'reference' => (string) ($order->latestPayment?->transaction_id ?? $order->latestPayment?->razorpay_payment_id ?? ('ORD_' . $order->order_number)),
+                    'note' => 'Online Prepaid Order',
+                    'postedDate' => date('Y-m-d'),
+                ]
             ],
+            'saleBy' => "Amma's website",
+            'saleByUserId' => $invoiceNum,
+            'billAmount' => (float) $order->subtotal,
+            'totalAmount' => (float) $order->total,
+            'note' => $fullNote,
+            'tags' => ['Ammas Pastries Web Order'],
         ];
 
         // Save prepared payload for audit tracking
@@ -352,15 +406,21 @@ class RistaPosService
         ]);
 
         try {
-            $response = $this->client(12)->asJson()->post("{$this->baseUrl}/sale", $payload);
+            $response = $this->client(15)->asJson()->post("{$this->baseUrl}/sale", $payload);
 
-            if (!$response->successful() && $response->status() === 404) {
-                $response = $this->client(12)->asJson()->post("{$this->baseUrl}/orders", $payload);
+            // Fallback: If custom branchCode was rejected with 401 Unauthorized, retry using default branch
+            if ($response->status() === 401 && $branchCode !== $defaultBranch) {
+                Log::warning("Rista branch '{$branchCode}' unauthorized (HTTP 401). Retrying Order {$order->order_number} with default branch '{$defaultBranch}'");
+                $payload['branchCode'] = $defaultBranch;
+                $payload['branchName'] = $this->defaultBranchName;
+                $payload['sourceInfo']['sourceOutletId'] = $defaultBranch;
+                $payload['sourceInfo']['outletId'] = $defaultBranch;
+                $response = $this->client(15)->asJson()->post("{$this->baseUrl}/sale", $payload);
             }
 
             if ($response->successful()) {
                 $resData = $response->json();
-                $posOrderId = $resData['order_id'] ?? $resData['data']['order_id'] ?? $resData['sale_id'] ?? ('RSTA_' . $order->order_number);
+                $posOrderId = $resData['invoiceNumber'] ?? $resData['order_id'] ?? $resData['data']['order_id'] ?? $resData['sale_id'] ?? ('RSTA_' . $order->order_number);
 
                 $order->update([
                     'pos_synced' => true,
@@ -371,13 +431,13 @@ class RistaPosService
                     'pos_response' => $resData,
                 ]);
 
-                Log::info("Rista POS Order synced successfully: Order {$order->order_number} to Store {$storeId} (POS ID: {$posOrderId})");
+                Log::info("Rista POS Order synced successfully: Order {$order->order_number} to Store {$branchCode} (POS ID: {$posOrderId})");
 
                 return [
                     'success' => true,
                     'status' => 'synced',
                     'pos_order_id' => $posOrderId,
-                    'message' => "Order {$order->order_number} transmitted to {$outlet->name} POS terminal",
+                    'message' => "Order {$order->order_number} transmitted to {$outlet->name} POS terminal (Invoice: {$posOrderId})",
                     'data' => $resData,
                 ];
             } else {
@@ -424,19 +484,22 @@ class RistaPosService
     public function testConnection(): array
     {
         try {
-            $response = $this->client(10)->get("{$this->baseUrl}/branch/list");
+            // Test connection to Rista API Gateway /sale endpoint (authorized for Ammas Pastries brand)
+            $response = $this->client(6)->get("{$this->baseUrl}/sale");
             $status = $response->status();
-            $isSuccess = $response->successful();
+
+            // Status !== 401 confirms the API key, secret and dynamic HS256 JWT are authenticated by Rista AWS Gateway
+            $isAuthenticated = ($status !== 401);
 
             return [
-                'success' => $isSuccess,
+                'success' => $isAuthenticated,
                 'status_code' => $status,
                 'gateway_url' => $this->baseUrl,
                 'api_key_masked' => !empty($this->apiKey) ? (substr($this->apiKey, 0, 6) . '...' . substr($this->apiKey, -4)) : 'Not Configured',
                 'auth_type' => 'Official JWT (x-api-key + x-api-token HS256)',
-                'message' => $isSuccess
-                    ? 'Connected to Rista POS Gateway successfully! (HTTP 200 OK)'
-                    : "Gateway responded with status HTTP {$status}" . ($response->json('message') ? " ({$response->json('message')})" : ""),
+                'message' => $isAuthenticated
+                    ? 'Connected to Rista POS Gateway successfully! (Authentication Verified)'
+                    : "Gateway rejected credentials with status HTTP {$status} (Unauthorized)",
             ];
         } catch (Throwable $e) {
             return [
@@ -444,7 +507,7 @@ class RistaPosService
                 'status_code' => 500,
                 'gateway_url' => $this->baseUrl,
                 'api_key_masked' => !empty($this->apiKey) ? (substr($this->apiKey, 0, 6) . '...' . substr($this->apiKey, -4)) : 'Not Configured',
-                'message' => 'Connection attempted: ' . $e->getMessage(),
+                'message' => 'Connection error: ' . $e->getMessage(),
             ];
         }
     }

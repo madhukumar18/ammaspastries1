@@ -46,7 +46,7 @@ const ProductCarousel = ({
 
   const handleScroll = (direction) => {
     if (!carouselRef.current) return;
-    const cardWidth = 316; // approx card width + gap
+    const cardWidth = window.innerWidth < 640 ? 175 : 280;
     const scrollAmount = direction === 'left' ? -cardWidth * 2 : cardWidth * 2;
     carouselRef.current.scrollBy({
       left: scrollAmount,
@@ -57,40 +57,40 @@ const ProductCarousel = ({
   if (!products || products.length === 0) return null;
 
   return (
-    <section className={`relative bg-gradient-to-b from-amber-50/40 via-white to-white rounded-3xl p-5 sm:p-8 border border-amber-100/90 shadow-warm ${className}`}>
+    <section className={`relative bg-gradient-to-b from-amber-50/40 via-white to-white rounded-2xl sm:rounded-3xl p-3.5 sm:p-6 md:p-8 border border-amber-100/90 shadow-warm ${className}`}>
       {/* Header with Title and Nav Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
         <div>
           {badgeText && (
-            <div className="inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-800 bg-amber-100/80 px-3 py-1 rounded-full mb-2 shadow-2xs">
-              {Icon && <Icon className="w-3.5 h-3.5 text-amber-600" />}
+            <div className="inline-flex items-center gap-1.5 text-[10px] sm:text-[11px] font-bold text-amber-800 bg-amber-100/80 px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full mb-1.5 sm:mb-2 shadow-2xs">
+              {Icon && <Icon className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-600" />}
               <span>{badgeText}</span>
             </div>
           )}
-          <h2 className="font-serif text-2xl sm:text-3xl font-bold text-chocolate tracking-tight">
+          <h2 className="font-serif text-lg sm:text-2xl md:text-3xl font-bold text-chocolate tracking-tight">
             {title}
           </h2>
           {subtitle && (
-            <p className="text-xs sm:text-sm text-slate-500 mt-1">
+            <p className="text-[11px] sm:text-xs md:text-sm text-slate-500 mt-0.5 sm:mt-1">
               {subtitle}
             </p>
           )}
         </div>
 
         {/* Navigation Buttons */}
-        <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2 self-end sm:self-auto shrink-0">
           <button
             type="button"
             onClick={() => handleScroll('left')}
             disabled={!canScrollLeft}
             aria-label="Previous products"
-            className={`w-10 h-10 rounded-full border flex items-center justify-center transition-all cursor-pointer ${
+            className={`w-7 h-7 sm:w-10 sm:h-10 rounded-full border flex items-center justify-center transition-all cursor-pointer ${
               canScrollLeft
                 ? 'bg-white hover:bg-amber-50 text-chocolate border-amber-200 shadow-xs hover:scale-105 active:scale-95'
                 : 'bg-slate-100 text-slate-300 border-slate-200 cursor-not-allowed opacity-60'
             }`}
           >
-            <ChevronLeft className="w-5 h-5" />
+            <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
 
           <button
@@ -98,13 +98,13 @@ const ProductCarousel = ({
             onClick={() => handleScroll('right')}
             disabled={!canScrollRight}
             aria-label="Next products"
-            className={`w-10 h-10 rounded-full border flex items-center justify-center transition-all cursor-pointer ${
+            className={`w-7 h-7 sm:w-10 sm:h-10 rounded-full border flex items-center justify-center transition-all cursor-pointer ${
               canScrollRight
                 ? 'bg-white hover:bg-amber-50 text-chocolate border-amber-200 shadow-xs hover:scale-105 active:scale-95'
                 : 'bg-slate-100 text-slate-300 border-slate-200 cursor-not-allowed opacity-60'
             }`}
           >
-            <ChevronRight className="w-5 h-5" />
+            <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
         </div>
       </div>
@@ -112,13 +112,13 @@ const ProductCarousel = ({
       {/* Horizontal Carousel Track */}
       <div
         ref={carouselRef}
-        className="flex gap-4 sm:gap-5 overflow-x-auto no-scrollbar scroll-smooth snap-x snap-mandatory py-2 -mx-1 px-1"
+        className="flex gap-2.5 sm:gap-4 md:gap-5 overflow-x-auto no-scrollbar scroll-smooth snap-x snap-mandatory py-1 sm:py-2 -mx-1 px-1"
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
       >
         {products.map((item) => (
           <div
             key={item.id}
-            className="w-[260px] sm:w-[285px] md:w-[295px] flex-shrink-0 snap-start"
+            className="w-[160px] xs:w-[175px] sm:w-[240px] md:w-[270px] flex-shrink-0 snap-start"
           >
             <ProductCard
               product={item}
@@ -130,7 +130,7 @@ const ProductCarousel = ({
       </div>
 
       {/* Subtle Progress Bar */}
-      <div className="mt-4 w-full bg-amber-100/60 h-1 rounded-full overflow-hidden">
+      <div className="mt-3 sm:mt-4 w-full bg-amber-100/60 h-1 rounded-full overflow-hidden">
         <div
           className="bg-gradient-to-r from-amber-500 to-amber-600 h-full rounded-full transition-all duration-300"
           style={{ width: `${Math.max(15, scrollProgress)}%` }}

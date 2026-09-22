@@ -23,8 +23,15 @@ import {
   FileSpreadsheet,
   FileUp,
   AlertCircle,
-  Scale
+  Scale,
+  Layers
 } from 'lucide-react';
+
+const DEFAULT_CAKE_SHAPES = [
+  { shape: 'Heart', name: 'Heart Shape', egg_price: '650', eggless_price: '700', image: '', is_active: true },
+  { shape: 'Round', name: 'Round Shape', egg_price: '500', eggless_price: '550', image: '', is_active: true },
+  { shape: 'Square', name: 'Square Shape', egg_price: '600', eggless_price: '650', image: '', is_active: true },
+];
 
 const AdminProductsPage = () => {
   const { showToast } = useApp();
@@ -53,6 +60,7 @@ const AdminProductsPage = () => {
   const [imageMode, setImageMode] = useState('gallery'); // 'gallery' or 'url'
   const [uploadingImage, setUploadingImage] = useState(false);
   const [uploadSuccessName, setUploadSuccessName] = useState('');
+  const [uploadingShapeIndex, setUploadingShapeIndex] = useState(null);
   const fileInputRef = useRef(null);
   const defaultCupcakeVariants = {
     cream_options: [
@@ -118,6 +126,7 @@ const AdminProductsPage = () => {
       { size_weight: '500g', price: '', discount_price: '' },
       { size_weight: '1kg', price: '', discount_price: '' },
     ],
+    shapes: DEFAULT_CAKE_SHAPES,
     enable_cupcake_matrix: false,
     cupcake_variants: defaultCupcakeVariants,
     enable_snack_matrix: false,
@@ -130,10 +139,31 @@ const AdminProductsPage = () => {
     dessert_default_price: '100',
     dessert_step_size: 1,
     dessert_price_tiers: [],
+    sell_by_kg: true,
+    kg_step: '0.5',
+    kg_default: '0.5',
+    kg_max: '10',
+    kg_price: '',
+    sell_by_pieces: false,
+    piece_default: '1',
+    piece_step: '1',
+    piece_max: '20',
+    enable_fixed_weight_pricing: false,
+    fixed_weight_options: [],
+    chocolate_pack_options: [],
+    chocolate_pricing_type: 'weight',
   });
 
   const [dietFilter, setDietFilter] = useState(''); // '', 'true', 'false'
   const [stockFilter, setStockFilter] = useState(''); // '', 'in_stock', 'out_of_stock'
+  const [currentPage, setCurrentPage] = useState(1);
+  const [perPage, setPerPage] = useState(15);
+  const [pagination, setPagination] = useState({
+    total: 0,
+    current_page: 1,
+    last_page: 1,
+    per_page: 15,
+  });
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -146,16 +176,19 @@ const AdminProductsPage = () => {
     if (catId) {
       setSelectedCat(catId);
       setSelectedSubcat('');
+      setCurrentPage(1);
     } else if (sectionSlug && categories.length > 0) {
       const found = categories.find((c) => c.slug === sectionSlug);
       if (found) {
         setSelectedCat(String(found.id));
         setSelectedSubcat('');
+        setCurrentPage(1);
       }
     } else if (!params.get('filter') && !params.get('action') && !location.search) {
       setSelectedCat('');
       setSelectedSubcat('');
       setStockFilter('');
+      setCurrentPage(1);
     }
 
     if (params.get('action') === 'new') {
@@ -170,24 +203,20 @@ const AdminProductsPage = () => {
     }
   }, [location.search, categories]);
 
-  const fetchProducts = async () => {
+  const fetchProducts = async (pageToFetch = currentPage) => {
     setLoading(true);
     try {
-      let url = `/admin/products?search=${encodeURIComponent(search)}&per_page=50`;
+      let url = `/admin/products?search=${encodeURIComponent(search)}&page=${pageToFetch}&per_page=${perPage}`;
       if (selectedCat) url += `&category_id=${selectedCat}`;
+      if (selectedSubcat) url += `&subcategory_id=${selectedSubcat}`;
       if (dietFilter) url += `&is_eggless=${dietFilter}`;
+      if (stockFilter) url += `&stock_status=${stockFilter}`;
       const res = await api.get(url);
       if (res.data?.data) {
-        let list = res.data.data;
-        if (selectedSubcat) {
-          list = list.filter((p) => String(p.subcategory_id) === String(selectedSubcat));
+        setProducts(res.data.data);
+        if (res.data.pagination) {
+          setPagination(res.data.pagination);
         }
-        if (stockFilter === 'out_of_stock') {
-          list = list.filter((p) => !p.is_available);
-        } else if (stockFilter === 'in_stock') {
-          list = list.filter((p) => Boolean(p.is_available));
-        }
-        setProducts(list);
       }
     } catch (err) {
       console.warn('Error loading admin products:', err);
@@ -197,8 +226,8 @@ const AdminProductsPage = () => {
   };
 
   useEffect(() => {
-    fetchProducts();
-  }, [search, selectedCat, selectedSubcat, dietFilter, stockFilter]);
+    fetchProducts(currentPage);
+  }, [currentPage, search, selectedCat, selectedSubcat, dietFilter, stockFilter, perPage]);
 
   useEffect(() => {
     const fetchCats = async () => {
@@ -235,6 +264,23 @@ const AdminProductsPage = () => {
     selectedCategoryObj?.name?.toLowerCase().includes('dry fruit') ||
     String(formData.category_id) === '4'
   );
+  const isChocolatesSelected = Boolean(
+    selectedCategoryObj?.slug === 'chocolates' ||
+    selectedCategoryObj?.name?.toLowerCase().includes('chocolate') ||
+    String(formData.category_id) === '5'
+  );
+  const isCakesAndPastriesSelected = Boolean(
+    selectedCategoryObj?.slug === 'cakes-pastries' ||
+    selectedCategoryObj?.name?.toLowerCase().includes('cakes & pastries') ||
+    selectedCategoryObj?.name?.toLowerCase().includes('cakes and pastries') ||
+    String(formData.category_id) === '1'
+  );
+  const isSweetsSelected = Boolean(
+    selectedCategoryObj?.slug === 'sweets' ||
+    selectedCategoryObj?.name?.toLowerCase().includes('sweet') ||
+    String(formData.category_id) === '9'
+  );
+  const isCakesOrSweetsSelected = isCakesAndPastriesSelected || isSweetsSelected;
 
   // Compute available subcategories for category filter
   const filterCategoryObj = categories.find((c) => String(c.id) === String(selectedCat));
@@ -289,6 +335,20 @@ const AdminProductsPage = () => {
       dessert_step_size: 1,
       dessert_price_tiers: [],
       dry_fruit_pack_options: [],
+      chocolate_pack_options: [],
+      chocolate_pricing_type: 'weight',
+      sell_by_kg: true,
+      kg_step: '0.5',
+      kg_default: '0.5',
+      kg_max: '10',
+      kg_price: '499',
+      sell_by_pieces: false,
+      piece_default: '1',
+      piece_step: '1',
+      piece_max: '20',
+      enable_fixed_weight_pricing: false,
+      fixed_weight_options: [],
+      shapes: DEFAULT_CAKE_SHAPES,
     });
     setNewCreamInput('');
     setNewEggInput('');
@@ -376,67 +436,231 @@ const AdminProductsPage = () => {
       ];
     }
 
-    setFormData({
-      name: product.name,
-      sku: product.sku || '',
-      category_id: product.category_id,
-      subcategory_id: product.subcategory_id || '',
-      base_price: product.base_price,
-      discount_price: product.discount_price || '',
-      weight: isDessertProduct
-        ? `${product.dessert_min_quantity || 2} Pcs`
-        : (product.weight || '500g'),
-      portion_type: isDessertProduct
-        ? 'portion'
-        : (product.portion_type || (product.weight && ((product.weight.toLowerCase().includes('piece') || product.weight.toLowerCase().includes('slice') || product.weight.toLowerCase().includes('portion') || product.weight.toLowerCase().includes('pcs')) && (product.weight.toLowerCase().includes('g') || product.weight.toLowerCase().includes('kg'))) ? 'both' : (product.weight && (product.weight.toLowerCase().includes('piece') || product.weight.toLowerCase().includes('slice') || product.weight.toLowerCase().includes('portion'))) ? 'portion' : 'weight')),
-      portion_unit: isDessertProduct ? 'pieces' : (product.portion_unit || 'grams'),
-      portion_step: isDessertProduct ? '1' : (product.portion_step || '500g'),
-      piece_price: product.piece_price ? String(product.piece_price) : '',
-      piece_limit: product.piece_limit !== null && product.piece_limit !== undefined ? String(product.piece_limit) : '20',
-      piece_min: product.piece_min ? String(product.piece_min) : '1',
-      is_unlimited_pieces: product.piece_limit === 0 || product.piece_limit === null,
-      short_description: product.short_description || '',
-      description: product.description || '',
-      is_eggless: !!product.is_eggless,
-      is_available: !!product.is_available,
-      is_featured: !!product.is_featured,
-      is_popular: !!product.is_popular,
-      is_new_arrival: !!product.is_new_arrival,
-      is_gifting: !!product.is_gifting,
-      image_url: product.image_url || '',
-      variants: product.variants?.map((v) => ({
-        size_weight: v.size_weight,
-        price: v.price,
-        discount_price: v.discount_price || '',
-      })) || [],
-      enable_cupcake_matrix: hasExistingMatrix || isCupcakeProduct,
-      cupcake_variants: product.cupcake_variants || defaultCupcakeVariants,
-      enable_snack_matrix: isSnackProduct || Boolean(product.snack_variants),
-      snack_variants: product.snack_variants || defaultSnackVariants,
-      theme_cake_default_weight: product.theme_cake_default_weight !== null && product.theme_cake_default_weight !== undefined
-        ? String(product.theme_cake_default_weight)
-        : (isThemeProduct ? '5' : ''),
-      theme_cake_default_price: product.theme_cake_default_price !== null && product.theme_cake_default_price !== undefined
-        ? String(product.theme_cake_default_price)
-        : (isThemeProduct ? String(product.base_price || 2000) : ''),
-      theme_cake_step_size: product.theme_cake_step_size !== null && product.theme_cake_step_size !== undefined
-        ? String(product.theme_cake_step_size)
-        : '1',
-      theme_cake_price_tiers: parsedTiers,
-      dessert_min_quantity: product.dessert_min_quantity !== null && product.dessert_min_quantity !== undefined
+    const isChocolateProduct = Boolean(
+      product.category?.slug === 'chocolates' ||
+      product.category?.name?.toLowerCase().includes('chocolate') ||
+      categories.find((c) => String(c.id) === String(product.category_id))?.slug === 'chocolates' ||
+      String(product.category_id) === '5' ||
+      (Array.isArray(product.chocolate_pack_options) && product.chocolate_pack_options.length > 0)
+    );
+
+    let parsedChocolatePacks = [];
+    if (Array.isArray(product.chocolate_pack_options)) {
+      parsedChocolatePacks = product.chocolate_pack_options;
+    } else if (typeof product.chocolate_pack_options === 'string') {
+      try {
+        parsedChocolatePacks = JSON.parse(product.chocolate_pack_options);
+      } catch (e) {
+        parsedChocolatePacks = [];
+      }
+    }
+    if (isChocolateProduct && parsedChocolatePacks.length === 0 && (!product.chocolate_pricing_type || product.chocolate_pricing_type === 'weight')) {
+      const match = String(product.weight || '').match(/^(\d+(?:\.\d+)?)\s*(g|kg)?$/i);
+      const w = match ? Number(match[1]) : 100;
+      const u = match && match[2] ? match[2].toLowerCase() : (w <= 10 ? 'kg' : 'g');
+      parsedChocolatePacks = [
+        { weight: w, unit: u, label: `${w}${u}`, price: Number(product.base_price || 120) }
+      ];
+    }
+
+    let parsedFixedWeightOptions = [];
+    if (Array.isArray(product.fixed_weight_options)) {
+      parsedFixedWeightOptions = product.fixed_weight_options;
+    } else if (typeof product.fixed_weight_options === 'string') {
+      try {
+        parsedFixedWeightOptions = JSON.parse(product.fixed_weight_options);
+      } catch (e) {
+        parsedFixedWeightOptions = [];
+      }
+    }
+
+    let parsedShapes = [];
+    if (Array.isArray(product.shapes)) {
+      parsedShapes = product.shapes;
+    } else if (typeof product.shapes === 'string') {
+      try {
+        parsedShapes = JSON.parse(product.shapes);
+      } catch (e) {
+        parsedShapes = [];
+      }
+    }
+
+    const mergedShapes = parsedShapes.length > 0
+      ? parsedShapes.map((s) => ({
+          id: s.id || (s.shape ? String(s.shape).toLowerCase() : 'shape'),
+          shape: s.shape || s.name || 'Shape',
+          name: s.name || (s.shape ? `${s.shape} Shape` : 'Custom Shape'),
+          egg_price: s.egg_price !== undefined && s.egg_price !== null && s.egg_price !== ''
+            ? String(s.egg_price)
+            : (s.price !== undefined && s.price !== null ? String(s.price) : ''),
+          eggless_price: s.eggless_price !== undefined && s.eggless_price !== null && s.eggless_price !== ''
+            ? String(s.eggless_price)
+            : (s.price !== undefined && s.price !== null ? String(s.price) : ''),
+          image: s.image || '',
+          is_active: s.is_active !== undefined ? Boolean(s.is_active) : true,
+        }))
+      : DEFAULT_CAKE_SHAPES.map((def) => ({
+          ...def,
+          egg_price: String(def.egg_price || product.egg_price || product.base_price || '650'),
+          eggless_price: String(def.eggless_price || product.eggless_price || '700'),
+          image: def.shape === 'Heart' ? (product.image_url || '') : '',
+          is_active: true,
+        }));
+
+      const dessertMinQty = product.dessert_min_quantity !== null && product.dessert_min_quantity !== undefined
         ? String(product.dessert_min_quantity)
-        : (isDessertProduct ? '2' : '1'),
-      dessert_default_price: product.dessert_default_price !== null && product.dessert_default_price !== undefined
-        ? String(product.dessert_default_price)
-        : (isDessertProduct ? String(product.base_price || 100) : ''),
-      dessert_step_size: 1,
-      dessert_price_tiers: parsedDessertTiers,
-      dry_fruit_pack_options: parsedDryFruitPacks,
-    });
+        : (product.piece_default ? String(product.piece_default) : (isDessertProduct ? '1' : '1'));
+      const dessertStep = product.dessert_step_size !== null && product.dessert_step_size !== undefined
+        ? String(product.dessert_step_size)
+        : (product.piece_step ? String(product.piece_step) : '1');
+      const dessertMax = product.piece_limit !== null && product.piece_limit !== undefined
+        ? String(product.piece_limit)
+        : (product.piece_max ? String(product.piece_max) : '20');
+      let dessertPricePerPiece = '';
+      if (product.piece_price && Number(product.piece_price) > 0) {
+        dessertPricePerPiece = String(product.piece_price);
+      } else if (product.dessert_default_price && Number(dessertMinQty) > 0) {
+        dessertPricePerPiece = String(Math.round((Number(product.dessert_default_price) / Number(dessertMinQty)) * 100) / 100);
+      } else if (product.base_price) {
+        dessertPricePerPiece = String(product.base_price);
+      }
+
+      setFormData({
+        name: product.name,
+        sku: product.sku || '',
+        category_id: product.category_id,
+        subcategory_id: product.subcategory_id || '',
+        base_price: product.base_price,
+        discount_price: product.discount_price || '',
+        weight: isDessertProduct
+          ? `${dessertMinQty} Pcs`
+          : (product.weight || '500g'),
+        portion_type: isDessertProduct
+          ? 'portion'
+          : (product.portion_type || (product.weight && ((product.weight.toLowerCase().includes('piece') || product.weight.toLowerCase().includes('slice') || product.weight.toLowerCase().includes('portion') || product.weight.toLowerCase().includes('pcs')) && (product.weight.toLowerCase().includes('g') || product.weight.toLowerCase().includes('kg'))) ? 'both' : (product.weight && (product.weight.toLowerCase().includes('piece') || product.weight.toLowerCase().includes('slice') || product.weight.toLowerCase().includes('portion'))) ? 'portion' : 'weight')),
+        portion_unit: isDessertProduct ? 'pieces' : (product.portion_unit || 'grams'),
+        portion_step: isDessertProduct ? dessertStep : (product.portion_step || '500g'),
+        piece_price: isDessertProduct ? dessertPricePerPiece : (product.piece_price ? String(product.piece_price) : ''),
+        piece_limit: dessertMax,
+        piece_min: dessertMinQty,
+        is_unlimited_pieces: product.piece_limit === 0 || product.piece_limit === null,
+        short_description: product.short_description || '',
+        description: product.description || '',
+        is_eggless: !!product.is_eggless,
+        is_available: !!product.is_available,
+        is_featured: !!product.is_featured,
+        is_popular: !!product.is_popular,
+        is_new_arrival: !!product.is_new_arrival,
+        is_gifting: !!product.is_gifting,
+        image_url: product.image_url || '',
+        variants: product.variants?.map((v) => ({
+          size_weight: v.size_weight,
+          price: v.price,
+          discount_price: v.discount_price || '',
+        })) || [],
+        shapes: mergedShapes,
+        enable_cupcake_matrix: hasExistingMatrix || isCupcakeProduct,
+        cupcake_variants: product.cupcake_variants || defaultCupcakeVariants,
+        enable_snack_matrix: isSnackProduct || Boolean(product.snack_variants),
+        snack_variants: product.snack_variants || defaultSnackVariants,
+        theme_cake_default_weight: product.theme_cake_default_weight !== null && product.theme_cake_default_weight !== undefined
+          ? String(product.theme_cake_default_weight)
+          : (isThemeProduct ? '5' : ''),
+        theme_cake_default_price: product.theme_cake_default_price !== null && product.theme_cake_default_price !== undefined
+          ? String(product.theme_cake_default_price)
+          : (isThemeProduct ? String(product.base_price || 2000) : ''),
+        theme_cake_step_size: product.theme_cake_step_size !== null && product.theme_cake_step_size !== undefined
+          ? String(product.theme_cake_step_size)
+          : '1',
+        theme_cake_price_tiers: parsedTiers,
+        dessert_min_quantity: dessertMinQty,
+        dessert_default_price: product.dessert_default_price !== null && product.dessert_default_price !== undefined
+          ? String(product.dessert_default_price)
+          : (isDessertProduct ? String(Number(dessertPricePerPiece || 50) * Number(dessertMinQty || 1)) : ''),
+        dessert_step_size: dessertStep,
+        dessert_price_tiers: parsedDessertTiers,
+        dry_fruit_pack_options: parsedDryFruitPacks,
+        chocolate_pack_options: parsedChocolatePacks,
+        chocolate_pricing_type: product.chocolate_pricing_type || (parsedChocolatePacks.length > 0 ? 'weight' : (product.sell_by_pieces ? 'piece' : 'weight')),
+        sell_by_kg: product.sell_by_kg !== null && product.sell_by_kg !== undefined ? Boolean(product.sell_by_kg) : true,
+        kg_step: product.kg_step !== null && product.kg_step !== undefined ? String(product.kg_step) : '0.5',
+        kg_default: product.kg_default !== null && product.kg_default !== undefined ? String(product.kg_default) : '0.5',
+        kg_max: product.kg_max !== null && product.kg_max !== undefined ? String(product.kg_max) : '10',
+        kg_price: product.kg_price !== null && product.kg_price !== undefined ? String(product.kg_price) : (product.base_price ? String(product.base_price) : ''),
+        sell_by_pieces: product.sell_by_pieces !== null && product.sell_by_pieces !== undefined ? Boolean(product.sell_by_pieces) : false,
+        piece_default: product.piece_default !== null && product.piece_default !== undefined ? String(product.piece_default) : '1',
+        piece_step: product.piece_step !== null && product.piece_step !== undefined ? String(product.piece_step) : '1',
+        piece_max: product.piece_max !== null && product.piece_max !== undefined ? String(product.piece_max) : '20',
+        enable_fixed_weight_pricing: Boolean(product.enable_fixed_weight_pricing),
+        fixed_weight_options: parsedFixedWeightOptions,
+      });
     setNewCreamInput('');
     setNewEggInput('');
     setImageMode('gallery');
     setModalOpen(true);
+  };
+
+  const handleAddShape = () => {
+    setFormData((prev) => ({
+      ...prev,
+      shapes: [
+        ...(prev.shapes || []),
+        {
+          id: `shape_${Date.now()}`,
+          shape: 'Custom',
+          name: 'Custom Shape',
+          egg_price: '',
+          eggless_price: '',
+          image: '',
+          is_active: true,
+        },
+      ],
+    }));
+  };
+
+  const handleRemoveShape = (index) => {
+    const shapeName = formData.shapes?.[index]?.name || formData.shapes?.[index]?.shape || 'this shape';
+    if (window.confirm(`Are you sure you want to delete "${shapeName}"? This will remove both its Egg and Eggless prices.`)) {
+      setFormData((prev) => {
+        const nextShapes = (prev.shapes || []).filter((_, i) => i !== index);
+        return { ...prev, shapes: nextShapes };
+      });
+      showToast(`Shape "${shapeName}" removed.`, 'info');
+    }
+  };
+
+  const handleUpdateShape = (index, field, value) => {
+    setFormData((prev) => {
+      const nextShapes = [...(prev.shapes || DEFAULT_CAKE_SHAPES)];
+      nextShapes[index] = { ...nextShapes[index], [field]: value };
+      return { ...prev, shapes: nextShapes };
+    });
+  };
+
+  const handleShapeImageUpload = async (index, file) => {
+    if (!file) return;
+    const payload = new FormData();
+    payload.append('image', file);
+    payload.append('folder', 'products/shapes');
+    setUploadingShapeIndex(index);
+    try {
+      const res = await api.post('/admin/media/upload', payload, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      const url = res.data?.data?.url;
+      if (url) {
+        setFormData((prev) => {
+          const nextShapes = [...(prev.shapes || DEFAULT_CAKE_SHAPES)];
+          nextShapes[index] = { ...nextShapes[index], image: url };
+          return { ...prev, shapes: nextShapes };
+        });
+        showToast('Shape photo uploaded successfully!', 'success');
+      }
+    } catch (err) {
+      showToast('Failed to upload shape image.', 'error');
+    } finally {
+      setUploadingShapeIndex(null);
+    }
   };
 
   const handleAddCreamOption = () => {
@@ -702,6 +926,88 @@ const AdminProductsPage = () => {
     setFormData((prev) => ({ ...prev, dry_fruit_pack_options: updated }));
   };
 
+  const handleAddChocolatePack = () => {
+    const currentPacks = formData.chocolate_pack_options || [];
+    let nextWeight = 100;
+    let nextUnit = 'g';
+    let nextPrice = 120;
+    if (currentPacks.length > 0) {
+      const last = currentPacks[currentPacks.length - 1];
+      if (last.unit === 'g') {
+        if (Number(last.weight) < 250) {
+          nextWeight = 250;
+          nextUnit = 'g';
+          nextPrice = Math.round(Number(last.price || 120) * 2.3);
+        } else if (Number(last.weight) < 500) {
+          nextWeight = 500;
+          nextUnit = 'g';
+          nextPrice = Math.round(Number(last.price || 250) * 1.9);
+        } else {
+          nextWeight = 1;
+          nextUnit = 'kg';
+          nextPrice = Math.round(Number(last.price || 450) * 1.9);
+        }
+      } else {
+        nextWeight = Number(last.weight) + 1;
+        nextUnit = 'kg';
+        nextPrice = Math.round(Number(last.price || 850) * (nextWeight / Math.max(1, Number(last.weight))));
+      }
+    }
+    setFormData((prev) => ({
+      ...prev,
+      chocolate_pack_options: [
+        ...(prev.chocolate_pack_options || []),
+        { weight: nextWeight, unit: nextUnit, price: nextPrice },
+      ],
+    }));
+  };
+
+  const handleUpdateChocolatePack = (index, field, value) => {
+    const updated = [...(formData.chocolate_pack_options || [])];
+    updated[index] = { ...updated[index], [field]: value };
+    setFormData((prev) => ({ ...prev, chocolate_pack_options: updated }));
+  };
+
+  const handleRemoveChocolatePack = (index) => {
+    const updated = (formData.chocolate_pack_options || []).filter((_, i) => i !== index);
+    setFormData((prev) => ({ ...prev, chocolate_pack_options: updated }));
+  };
+
+  const handleAddFixedWeightOption = () => {
+    const current = formData.fixed_weight_options || [];
+    let nextNum = 1;
+    let nextPrice = 500;
+    if (current.length > 0) {
+      const last = current[current.length - 1];
+      const match = String(last.weight || '').match(/^(\d+(?:\.\d+)?)/);
+      if (match) {
+        nextNum = Number(match[1]) + 1;
+      } else {
+        nextNum = current.length + 1;
+      }
+      const lastPrice = Number(last.price) || 500;
+      nextPrice = Math.round(lastPrice * (nextNum / Math.max(1, nextNum - 1)) * 0.95);
+    }
+    setFormData((prev) => ({
+      ...prev,
+      fixed_weight_options: [
+        ...(prev.fixed_weight_options || []),
+        { weight: `${nextNum} kg`, price: nextPrice },
+      ],
+    }));
+  };
+
+  const handleUpdateFixedWeightOption = (index, field, value) => {
+    const updated = [...(formData.fixed_weight_options || [])];
+    updated[index] = { ...updated[index], [field]: value };
+    setFormData((prev) => ({ ...prev, fixed_weight_options: updated }));
+  };
+
+  const handleRemoveFixedWeightOption = (index) => {
+    const updated = (formData.fixed_weight_options || []).filter((_, i) => i !== index);
+    setFormData((prev) => ({ ...prev, fixed_weight_options: updated }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -720,6 +1026,94 @@ const AdminProductsPage = () => {
         selectedCategoryObj?.name?.toLowerCase().includes('dry fruit') ||
         String(formData.category_id) === '4'
       );
+      const isChocolates = Boolean(
+        selectedCategoryObj?.slug === 'chocolates' ||
+        selectedCategoryObj?.name?.toLowerCase().includes('chocolate') ||
+        String(formData.category_id) === '5'
+      );
+      const isCakesAndPastries = Boolean(
+        selectedCategoryObj?.slug === 'cakes-pastries' ||
+        selectedCategoryObj?.name?.toLowerCase().includes('cakes & pastries') ||
+        selectedCategoryObj?.name?.toLowerCase().includes('cakes and pastries') ||
+        String(formData.category_id) === '1'
+      );
+      const isSweets = Boolean(
+        selectedCategoryObj?.slug === 'sweets' ||
+        selectedCategoryObj?.name?.toLowerCase().includes('sweet') ||
+        String(formData.category_id) === '9'
+      );
+      const isCakesOrSweets = isCakesAndPastries || isSweets;
+
+      if (isCakesOrSweets) {
+        if (!formData.sell_by_kg && !formData.sell_by_pieces) {
+          showToast(`Please enable at least one sale option: Sell by kg or Sell by pieces for this ${isSweets ? 'sweet' : 'cake'}.`, 'warning');
+          return;
+        }
+
+        if (formData.sell_by_kg) {
+          const kgStep = Number(formData.kg_step);
+          const kgDefault = Number(formData.kg_default);
+          const kgMax = Number(formData.kg_max);
+          const kgPrice = Number(formData.kg_price);
+
+          if (!kgPrice || kgPrice <= 0) {
+            showToast('Price per kg must be greater than 0.', 'warning');
+            return;
+          }
+          if (!kgDefault || kgDefault <= 0) {
+            showToast('Default kg must be greater than 0.', 'warning');
+            return;
+          }
+          if (kgDefault > kgMax) {
+            showToast('Default kg cannot be greater than maximum kg.', 'warning');
+            return;
+          }
+          const stepInt = Math.round(kgStep * 10);
+          const defInt = Math.round(kgDefault * 10);
+          if (stepInt > 0 && defInt % stepInt !== 0) {
+            showToast(`Default kg (${kgDefault}) must be a multiple of increment step (${kgStep} kg).`, 'warning');
+            return;
+          }
+        }
+
+        if (formData.sell_by_pieces) {
+          const pieceDefault = parseInt(formData.piece_default, 10);
+          const pieceStep = parseInt(formData.piece_step, 10);
+          const pieceMax = parseInt(formData.piece_max, 10);
+          const piecePrice = Number(formData.piece_price);
+
+          if (!piecePrice || piecePrice <= 0) {
+            showToast('Price per piece must be greater than 0.', 'warning');
+            return;
+          }
+          if (!pieceDefault || pieceDefault < 1) {
+            showToast('Default pieces must be at least 1.', 'warning');
+            return;
+          }
+          if (!pieceStep || pieceStep < 1) {
+            showToast('Increment step for pieces must be at least 1.', 'warning');
+            return;
+          }
+          if (pieceDefault > pieceMax) {
+            showToast('Default pieces cannot be greater than maximum pieces.', 'warning');
+            return;
+          }
+          if (pieceDefault % pieceStep !== 0) {
+            showToast(`Default pieces (${pieceDefault}) must be a multiple of increment step (${pieceStep}).`, 'warning');
+            return;
+          }
+        }
+
+        if (formData.enable_fixed_weight_pricing) {
+          const validFixed = (formData.fixed_weight_options || []).filter(
+            (o) => String(o.weight || '').trim() !== '' && Number(o.price) > 0
+          );
+          if (validFixed.length === 0) {
+            showToast('Please add at least one fixed weight option with a valid price (e.g. 1 kg → ₹500).', 'warning');
+            return;
+          }
+        }
+      }
 
       const payload = {
         ...formData,
@@ -737,18 +1131,78 @@ const AdminProductsPage = () => {
         dessert_step_size: 1,
         dessert_price_tiers: isDessert ? (formData.dessert_price_tiers || []) : null,
         dry_fruit_pack_options: isDryFruit ? (formData.dry_fruit_pack_options || []) : null,
+        chocolate_pack_options: isChocolates ? (formData.chocolate_pack_options || []) : null,
+        chocolate_pricing_type: isChocolates ? (formData.chocolate_pricing_type || 'weight') : null,
+        sell_by_kg: isCakesOrSweets ? Boolean(formData.sell_by_kg) : false,
+        kg_step: isCakesOrSweets && formData.sell_by_kg ? Number(formData.kg_step) : null,
+        kg_default: isCakesOrSweets && formData.sell_by_kg ? Number(formData.kg_default) : null,
+        kg_max: isCakesOrSweets && formData.sell_by_kg ? Number(formData.kg_max) : null,
+        kg_price: isCakesOrSweets && formData.sell_by_kg ? Number(formData.kg_price) : null,
+        sell_by_pieces: isCakesOrSweets ? Boolean(formData.sell_by_pieces) : false,
+        piece_default: isCakesOrSweets && formData.sell_by_pieces ? parseInt(formData.piece_default, 10) : null,
+        piece_step: isCakesOrSweets && formData.sell_by_pieces ? parseInt(formData.piece_step, 10) : null,
+        piece_max: isCakesOrSweets && formData.sell_by_pieces ? parseInt(formData.piece_max, 10) : null,
+        enable_fixed_weight_pricing: isCakesOrSweets ? Boolean(formData.enable_fixed_weight_pricing) : false,
+        fixed_weight_options: isCakesOrSweets && formData.enable_fixed_weight_pricing ? (formData.fixed_weight_options || []) : [],
+        shapes: isCakesAndPastries && Array.isArray(formData.shapes) ? formData.shapes : null,
       };
+
+      if (isCakesOrSweets) {
+        if (formData.sell_by_kg) {
+          payload.base_price = Number(formData.kg_price);
+          payload.weight = `${formData.kg_default}kg`;
+          payload.portion_type = formData.sell_by_pieces ? 'both' : 'weight';
+          payload.portion_unit = formData.sell_by_pieces ? 'both' : 'kg';
+        } else if (formData.sell_by_pieces) {
+          payload.base_price = Number(formData.piece_price);
+          payload.weight = `${formData.piece_default} Pcs`;
+          payload.portion_type = 'portion';
+          payload.portion_unit = 'pieces';
+        }
+        if (formData.enable_fixed_weight_pricing && formData.fixed_weight_options?.length > 0) {
+          const firstOpt = formData.fixed_weight_options[0];
+          if (firstOpt?.price) {
+            payload.base_price = Number(firstOpt.price);
+          }
+          if (firstOpt?.weight) {
+            payload.weight = firstOpt.weight;
+          }
+        }
+      }
 
       if (isTheme) {
         payload.base_price = payload.theme_cake_default_price || formData.base_price || 2000;
         payload.weight = `${payload.theme_cake_default_weight || 5}kg`;
       }
       if (isDessert) {
-        payload.base_price = payload.dessert_default_price || formData.base_price || 100;
-        payload.weight = `${payload.dessert_min_quantity || 1} Pcs`;
+        const unitPrice = Number(formData.piece_price || formData.dessert_default_price || formData.base_price || 0);
+        const defaultPieces = Math.max(1, parseInt(formData.dessert_min_quantity || 1, 10));
+        const stepPieces = Math.max(1, parseInt(formData.dessert_step_size || 1, 10));
+        const maxPieces = Math.max(defaultPieces, parseInt(formData.piece_limit || 20, 10));
+
+        if (!unitPrice || unitPrice <= 0) {
+          showToast('Price per piece must be greater than 0.', 'warning');
+          return;
+        }
+        if (parseInt(formData.piece_limit, 10) < defaultPieces) {
+          showToast('Maximum pieces limit cannot be less than default starting pieces.', 'warning');
+          return;
+        }
+
+        payload.piece_price = unitPrice;
+        payload.dessert_min_quantity = defaultPieces;
+        payload.dessert_step_size = stepPieces;
+        payload.piece_default = defaultPieces;
+        payload.piece_step = stepPieces;
+        payload.piece_limit = maxPieces;
+        payload.piece_max = maxPieces;
+        payload.piece_min = defaultPieces;
+        payload.dessert_default_price = Math.round(unitPrice * defaultPieces);
+        payload.base_price = payload.dessert_default_price;
+        payload.weight = `${defaultPieces} Pcs`;
         payload.portion_type = 'portion';
         payload.portion_unit = 'pieces';
-        payload.portion_step = '1';
+        payload.portion_step = String(stepPieces);
       }
       if (isDryFruit) {
         const rawPacks = formData.dry_fruit_pack_options || [];
@@ -1026,7 +1480,10 @@ const AdminProductsPage = () => {
             <input
               type="text"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setCurrentPage(1);
+              }}
               placeholder="Search product name or SKU..."
               className="w-full text-xs pl-8 pr-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-400"
             />
@@ -1039,10 +1496,11 @@ const AdminProductsPage = () => {
             onChange={(e) => {
               setSelectedCat(e.target.value);
               setSelectedSubcat('');
+              setCurrentPage(1);
             }}
-            className="text-xs p-2 rounded-xl border border-slate-200 font-medium text-chocolate focus:outline-none"
+            className="text-xs p-2 rounded-xl border border-slate-200 font-medium text-chocolate focus:outline-none cursor-pointer"
           >
-            <option value="">All Categories</option>
+            <option value="">All</option>
             {categories.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -1054,8 +1512,11 @@ const AdminProductsPage = () => {
           {filterSubcategories.length > 0 && (
             <select
               value={selectedSubcat}
-              onChange={(e) => setSelectedSubcat(e.target.value)}
-              className="text-xs p-2 rounded-xl border border-amber-300 bg-amber-50/50 font-medium text-amber-900 focus:outline-none"
+              onChange={(e) => {
+                setSelectedSubcat(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="text-xs p-2 rounded-xl border border-amber-300 bg-amber-50/50 font-medium text-amber-900 focus:outline-none cursor-pointer"
             >
               <option value="">All Varieties / Subcategories</option>
               {filterSubcategories.map((sub) => (
@@ -1069,8 +1530,11 @@ const AdminProductsPage = () => {
           {/* Dietary Filter in Admin */}
           <select
             value={dietFilter}
-            onChange={(e) => setDietFilter(e.target.value)}
-            className="text-xs p-2 rounded-xl border border-slate-200 font-medium text-chocolate focus:outline-none"
+            onChange={(e) => {
+              setDietFilter(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="text-xs p-2 rounded-xl border border-slate-200 font-medium text-chocolate focus:outline-none cursor-pointer"
           >
             <option value="">All Diet Types</option>
             <option value="true">🌱 100% Eggless</option>
@@ -1080,8 +1544,11 @@ const AdminProductsPage = () => {
           {/* Stock Availability Filter */}
           <select
             value={stockFilter}
-            onChange={(e) => setStockFilter(e.target.value)}
-            className="text-xs p-2 rounded-xl border border-slate-200 font-medium text-chocolate focus:outline-none"
+            onChange={(e) => {
+              setStockFilter(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="text-xs p-2 rounded-xl border border-slate-200 font-medium text-chocolate focus:outline-none cursor-pointer"
           >
             <option value="">All Stock Status</option>
             <option value="in_stock">✅ In Stock</option>
@@ -1091,13 +1558,13 @@ const AdminProductsPage = () => {
       </div>
 
       {/* Active Section Filter Banner */}
-      {(selectedCat || stockFilter || selectedSubcat) && (
+      {(selectedCat || stockFilter || selectedSubcat || dietFilter || search) && (
         <div className="bg-amber-500/10 border border-amber-300 rounded-2xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-chocolate shadow-2xs">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-bold text-amber-900">Showing Section Products:</span>
+            <span className="font-bold text-amber-900">Active Filters:</span>
             {selectedCat && (
               <span className="bg-white border border-amber-300 text-amber-900 font-bold px-2.5 py-1 rounded-lg shadow-2xs">
-                Category: {categories.find((c) => String(c.id) === String(selectedCat))?.name || 'Selected Section'}
+                Category: {categories.find((c) => String(c.id) === String(selectedCat))?.name || 'Selected Category'}
               </span>
             )}
             {selectedSubcat && (
@@ -1105,12 +1572,22 @@ const AdminProductsPage = () => {
                 Variety: {filterSubcategories.find((s) => String(s.id) === String(selectedSubcat))?.name || selectedSubcat}
               </span>
             )}
+            {search && (
+              <span className="bg-white border border-amber-300 text-amber-900 font-bold px-2.5 py-1 rounded-lg shadow-2xs">
+                Search: "{search}"
+              </span>
+            )}
             {stockFilter && (
               <span className="bg-white border border-amber-300 text-amber-900 font-bold px-2.5 py-1 rounded-lg shadow-2xs">
                 Status: {stockFilter === 'out_of_stock' ? 'Out of Stock' : 'In Stock'}
               </span>
             )}
-            <span className="text-slate-500 font-semibold">({products.length} products)</span>
+            {dietFilter && (
+              <span className="bg-white border border-amber-300 text-amber-900 font-bold px-2.5 py-1 rounded-lg shadow-2xs">
+                Diet: {dietFilter === 'true' ? '100% Eggless' : 'With Egg'}
+              </span>
+            )}
+            <span className="text-slate-500 font-semibold">({pagination.total} products)</span>
           </div>
           <button
             type="button"
@@ -1118,11 +1595,14 @@ const AdminProductsPage = () => {
               setSelectedCat('');
               setSelectedSubcat('');
               setStockFilter('');
+              setDietFilter('');
+              setSearch('');
+              setCurrentPage(1);
               navigate('/admin/products');
             }}
             className="text-xs font-bold text-amber-900 hover:text-rose-600 bg-white border border-amber-300 hover:border-rose-300 px-3 py-1.5 rounded-lg transition-colors shadow-2xs cursor-pointer shrink-0"
           >
-            Clear / Show All Products
+            Clear / Show All
           </button>
         </div>
       )}
@@ -1278,8 +1758,33 @@ const AdminProductsPage = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="8" className="p-8 text-center text-slate-400">
-                    No products found matching filters.
+                  <td colSpan="8" className="p-12 text-center">
+                    <div className="flex flex-col items-center justify-center gap-2.5 max-w-md mx-auto py-4">
+                      <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-700 text-xl shadow-2xs">
+                        🍰
+                      </div>
+                      <div className="font-serif font-bold text-base text-chocolate">
+                        {selectedCat ? 'No products in this category' : 'No products found'}
+                      </div>
+                      <p className="text-xs text-slate-500 max-w-sm">
+                        {selectedCat
+                          ? 'No products in this category match your current filter or search criteria.'
+                          : 'Try changing your search query or removing filters to view all products.'}
+                      </p>
+                      {selectedCat && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedCat('');
+                            setSelectedSubcat('');
+                            setCurrentPage(1);
+                          }}
+                          className="mt-1 text-xs font-bold text-amber-900 hover:text-white bg-amber-100/80 hover:bg-amber-600 border border-amber-300 px-3.5 py-1.5 rounded-xl transition-all shadow-2xs cursor-pointer"
+                        >
+                          Show All Products
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               )}
@@ -1287,6 +1792,65 @@ const AdminProductsPage = () => {
           </table>
         </div>
       </div>
+
+      {/* Pagination Controls */}
+      {pagination.total > 0 && pagination.last_page > 1 && (
+        <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+          <div className="text-slate-500 font-medium">
+            Showing <strong className="text-chocolate font-bold">{((pagination.current_page - 1) * pagination.per_page) + 1}</strong> to{' '}
+            <strong className="text-chocolate font-bold">
+              {Math.min(pagination.current_page * pagination.per_page, pagination.total)}
+            </strong> of{' '}
+            <strong className="text-chocolate font-bold">{pagination.total}</strong> products
+          </div>
+
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <button
+              type="button"
+              disabled={currentPage <= 1 || loading}
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              className="px-3 py-1.5 rounded-xl border border-slate-200 font-bold text-xs text-chocolate hover:bg-amber-50 hover:border-amber-300 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer shadow-2xs"
+            >
+              Previous
+            </button>
+
+            {Array.from({ length: pagination.last_page }, (_, i) => i + 1)
+              .filter((p) => {
+                return p === 1 || p === pagination.last_page || Math.abs(p - currentPage) <= 1;
+              })
+              .map((pageNum, idx, arr) => {
+                const prevPageNum = arr[idx - 1];
+                const showEllipsis = prevPageNum && pageNum - prevPageNum > 1;
+                return (
+                  <React.Fragment key={pageNum}>
+                    {showEllipsis && <span className="px-1 text-slate-400 font-bold">...</span>}
+                    <button
+                      type="button"
+                      onClick={() => setCurrentPage(pageNum)}
+                      disabled={loading}
+                      className={`w-8 h-8 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center justify-center ${
+                        currentPage === pageNum
+                          ? 'bg-chocolate text-white shadow-xs'
+                          : 'border border-slate-200 text-slate-600 hover:bg-amber-50 hover:border-amber-300'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  </React.Fragment>
+                );
+              })}
+
+            <button
+              type="button"
+              disabled={currentPage >= pagination.last_page || loading}
+              onClick={() => setCurrentPage((p) => Math.min(pagination.last_page, p + 1))}
+              className="px-3 py-1.5 rounded-xl border border-slate-200 font-bold text-xs text-chocolate hover:bg-amber-50 hover:border-amber-300 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer shadow-2xs"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Add / Edit Product Modal */}
       {modalOpen && (
@@ -1367,7 +1931,7 @@ const AdminProductsPage = () => {
                 {/* Subcategory / Varieties Selector */}
                 <div>
                   <label className="block font-bold text-amber-900 mb-1 flex items-center justify-between">
-                    <span>Cake Variety / Subcategory</span>
+                    <span>{isSweetsSelected ? 'Sweet Variety / Subcategory' : 'Cake Variety / Subcategory'}</span>
                     <span className="text-[10px] text-amber-600 font-normal">e.g. Exotic Fruitz, Mousse</span>
                   </label>
                   <select
@@ -1608,11 +2172,42 @@ const AdminProductsPage = () => {
                       </div>
                     </div>
 
-                    {/* Core Inputs: Minimum Quantity & Default Price */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {/* Core Inputs: Price per piece, Default pieces, Increment step, Maximum limit */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                       <div>
                         <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                          Minimum Order Quantity (Pcs) *
+                          Price per Piece (₹) *
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          step="any"
+                          required={isDessertSelected}
+                          value={formData.piece_price}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setFormData((prev) => {
+                              const minQ = Number(prev.dessert_min_quantity || 1);
+                              const totalDef = val && !isNaN(Number(val)) ? Math.round(Number(val) * minQ) : prev.dessert_default_price;
+                              return {
+                                ...prev,
+                                piece_price: val,
+                                dessert_default_price: totalDef,
+                                base_price: totalDef || val,
+                              };
+                            });
+                          }}
+                          placeholder="e.g. 50"
+                          className="w-full px-3 py-2 rounded-xl border border-rose-200 bg-white text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-rose-400 font-mono"
+                        />
+                        <p className="text-[10px] text-slate-400 mt-1">
+                          The price per piece (e.g. ₹50).
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                          Default (Starting) Pieces *
                         </label>
                         <input
                           type="number"
@@ -1622,54 +2217,64 @@ const AdminProductsPage = () => {
                           value={formData.dessert_min_quantity}
                           onChange={(e) => {
                             const val = Math.max(1, parseInt(e.target.value) || 1);
-                            setFormData((prev) => ({ ...prev, dessert_min_quantity: val }));
+                            setFormData((prev) => {
+                              const pPrice = Number(prev.piece_price || 0);
+                              return {
+                                ...prev,
+                                dessert_min_quantity: val,
+                                dessert_default_price: pPrice > 0 ? Math.round(pPrice * val) : prev.dessert_default_price,
+                              };
+                            });
+                          }}
+                          placeholder="e.g. 1"
+                          className="w-full px-3 py-2 rounded-xl border border-rose-200 bg-white text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-rose-400 font-mono"
+                        />
+                        <p className="text-[10px] text-slate-400 mt-1">
+                          Customer quantity starts at this number (e.g. 1 piece).
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                          Increment Step (Pieces) *
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          step="1"
+                          required={isDessertSelected}
+                          value={formData.dessert_step_size}
+                          onChange={(e) => {
+                            const val = Math.max(1, parseInt(e.target.value) || 1);
+                            setFormData((prev) => ({ ...prev, dessert_step_size: val }));
                           }}
                           placeholder="e.g. 2"
                           className="w-full px-3 py-2 rounded-xl border border-rose-200 bg-white text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-rose-400 font-mono"
                         />
                         <p className="text-[10px] text-slate-400 mt-1">
-                          The starting piece count (e.g. 2 pcs). Customer cannot order fewer pieces.
+                          Pieces added each + click (e.g. 2 → {formData.dessert_min_quantity || 1}, {Number(formData.dessert_min_quantity || 1) + (Number(formData.dessert_step_size) || 1)}, {Number(formData.dessert_min_quantity || 1) + 2 * (Number(formData.dessert_step_size) || 1)}…).
                         </p>
                       </div>
 
                       <div>
                         <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                          Default Price for Min Quantity (₹) *
+                          Maximum Limit (Pieces) *
                         </label>
                         <input
                           type="number"
-                          min="0"
+                          min={formData.dessert_min_quantity || 1}
                           step="1"
                           required={isDessertSelected}
-                          value={formData.dessert_default_price}
+                          value={formData.piece_limit}
                           onChange={(e) => {
-                            const val = e.target.value;
-                            setFormData((prev) => ({
-                              ...prev,
-                              dessert_default_price: val,
-                              base_price: val,
-                            }));
+                            const val = Math.max(1, parseInt(e.target.value) || 1);
+                            setFormData((prev) => ({ ...prev, piece_limit: val }));
                           }}
-                          placeholder="e.g. 100"
+                          placeholder="e.g. 10"
                           className="w-full px-3 py-2 rounded-xl border border-rose-200 bg-white text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-rose-400 font-mono"
                         />
                         <p className="text-[10px] text-slate-400 mt-1">
-                          Total price for {formData.dessert_min_quantity || 2} pieces.
-                        </p>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                          Step Increment (Pcs)
-                        </label>
-                        <input
-                          type="text"
-                          disabled
-                          value="1 Piece (Fixed)"
-                          className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-100 text-xs font-semibold text-slate-500 cursor-not-allowed font-mono"
-                        />
-                        <p className="text-[10px] text-slate-400 mt-1">
-                          Each &ldquo;+&rdquo; tap adds exactly 1 piece: {formData.dessert_min_quantity || 2} → {Number(formData.dessert_min_quantity || 2) + 1} → {Number(formData.dessert_min_quantity || 2) + 2}…
+                          Maximum pieces customer can select. + button stops here.
                         </p>
                       </div>
                     </div>
@@ -1678,50 +2283,59 @@ const AdminProductsPage = () => {
                     <div className="bg-white/80 rounded-xl p-3 border border-rose-200 space-y-2">
                       <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                         <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-700">Calculated Unit Rate:</span>
+                          <span className="font-bold text-slate-700">Configured Rate:</span>
                           <span className="bg-rose-100 text-rose-800 px-2 py-0.5 rounded font-black font-mono">
-                            ₹{Number(formData.dessert_default_price || formData.base_price || 0) > 0 && Number(formData.dessert_min_quantity || 1) > 0
-                              ? (Number(formData.dessert_default_price || formData.base_price || 0) / Number(formData.dessert_min_quantity || 1)).toFixed(2)
-                              : '0.00'} / piece
+                            ₹{Number(formData.piece_price || (Number(formData.dessert_default_price || formData.base_price || 0) / Number(formData.dessert_min_quantity || 1)) || 0).toFixed(2)} / piece
                           </span>
                         </div>
-                        <span className="text-[11px] text-slate-500 italic">
-                          Prices for quantities without custom overrides scale linearly at this unit rate.
+                        <span className="text-[11px] text-slate-500">
+                          Starting Base Total: <strong>{formData.dessert_min_quantity || 1} Pcs = ₹{Math.round(Number(formData.dessert_min_quantity || 1) * Number(formData.piece_price || (Number(formData.dessert_default_price || formData.base_price || 0) / Number(formData.dessert_min_quantity || 1)) || 0))}</strong>
                         </span>
                       </div>
 
                       {/* Preview Pill Chips */}
                       <div className="pt-2 border-t border-rose-100">
                         <span className="text-[11px] font-bold text-slate-600 block mb-1.5">
-                          Customer Stepper Preview:
+                          Customer Stepper Sequence (Starts at {formData.dessert_min_quantity || 1} pcs, step +{formData.dessert_step_size || 1}, max {formData.piece_limit || 20} pcs):
                         </span>
                         <div className="flex flex-wrap gap-1.5">
-                          {[0, 1, 2, 3, 4].map((stepIdx) => {
-                            const qty = Number(formData.dessert_min_quantity || 2) + stepIdx;
-                            const tierOverride = (formData.dessert_price_tiers || []).find(
-                              (t) => Number(t.quantity) === qty
-                            );
-                            const unitPrice =
-                              Number(formData.dessert_min_quantity || 1) > 0
-                                ? Number(formData.dessert_default_price || formData.base_price || 0) / Number(formData.dessert_min_quantity || 1)
-                                : 0;
-                            const price = tierOverride ? Number(tierOverride.price) : Math.round(unitPrice * qty);
+                          {(() => {
+                            const minQ = Number(formData.dessert_min_quantity || 1);
+                            const stepQ = Math.max(1, Number(formData.dessert_step_size || 1));
+                            const maxQ = Math.max(minQ, Number(formData.piece_limit || 20));
+                            const unitP = Number(formData.piece_price || (Number(formData.dessert_default_price || formData.base_price || 0) / minQ) || 0);
 
-                            return (
-                              <span
-                                key={qty}
-                                className={`text-[11px] px-2.5 py-1 rounded-lg border font-mono ${
-                                  stepIdx === 0
-                                    ? 'bg-rose-600 text-white border-rose-600 font-black'
-                                    : 'bg-white text-slate-700 border-slate-200'
-                                }`}
-                              >
-                                {qty} Pcs = ₹{price}
-                                {stepIdx === 0 && ' (Min Base)'}
-                                {tierOverride && ' 🏷️'}
-                              </span>
-                            );
-                          })}
+                            const previewList = [];
+                            for (let q = minQ; q <= maxQ && previewList.length < 8; q += stepQ) {
+                              previewList.push(q);
+                            }
+
+                            return previewList.map((qty, idx) => {
+                              const tierOverride = (formData.dessert_price_tiers || []).find(
+                                (t) => Number(t.quantity) === qty
+                              );
+                              const price = tierOverride ? Number(tierOverride.price) : Math.round(unitP * qty);
+                              const isLast = idx === previewList.length - 1;
+
+                              return (
+                                <span
+                                  key={qty}
+                                  className={`text-[11px] px-2.5 py-1 rounded-lg border font-mono ${
+                                    idx === 0
+                                      ? 'bg-rose-600 text-white border-rose-600 font-black'
+                                      : isLast
+                                      ? 'bg-rose-50 text-rose-800 border-rose-300 font-bold'
+                                      : 'bg-white text-slate-700 border-slate-200'
+                                  }`}
+                                >
+                                  {qty} Pcs = ₹{price}
+                                  {idx === 0 && ' (Default)'}
+                                  {isLast && idx !== 0 && ' (Max Reachable)'}
+                                  {tierOverride && ' 🏷️'}
+                                </span>
+                              );
+                            });
+                          })()}
                         </div>
                       </div>
                     </div>
@@ -1960,8 +2574,252 @@ const AdminProductsPage = () => {
                   </div>
                 )}
 
+                {/* CHOCOLATES PACKAGING & PRICING SECTION */}
+                {isChocolatesSelected && (
+                  <div className="sm:col-span-2 rounded-2xl border-2 border-amber-800/70 bg-gradient-to-br from-amber-950/5 via-white to-amber-900/5 p-4 sm:p-5 shadow-sm space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl">🍫</span>
+                          <h4 className="text-sm font-black text-amber-950">
+                            Chocolates Packaging &amp; Pricing Configuration
+                          </h4>
+                          <span className="text-[10px] font-extrabold bg-amber-800 text-white px-2.5 py-0.5 rounded-full shadow-xs uppercase tracking-wide">
+                            Category: Chocolates
+                          </span>
+                        </div>
+                        <p className="text-xs text-amber-900/80 mt-1">
+                          Configure whether this chocolate is sold by <strong>Weight Variants (100g, 250g, 500g, etc.)</strong>, by <strong>Piece Count (starts at 1, +1 increment)</strong>, or <strong>Both</strong>.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* SALE MODE SWITCHER TABS */}
+                    <div className="flex items-center gap-2 p-1.5 bg-amber-100/70 rounded-xl border border-amber-300 max-w-md">
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, chocolate_pricing_type: 'weight' })}
+                        className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          (formData.chocolate_pricing_type || 'weight') === 'weight'
+                            ? 'bg-amber-900 text-white shadow-xs'
+                            : 'text-amber-900 hover:bg-white/60'
+                        }`}
+                      >
+                        ⚖️ By Weight Packs
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, chocolate_pricing_type: 'piece' })}
+                        className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          formData.chocolate_pricing_type === 'piece'
+                            ? 'bg-amber-900 text-white shadow-xs'
+                            : 'text-amber-900 hover:bg-white/60'
+                        }`}
+                      >
+                        🍬 By Piece Count
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, chocolate_pricing_type: 'both' })}
+                        className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          formData.chocolate_pricing_type === 'both'
+                            ? 'bg-amber-900 text-white shadow-xs'
+                            : 'text-amber-900 hover:bg-white/60'
+                        }`}
+                      >
+                        🔄 Both (Weight &amp; Piece)
+                      </button>
+                    </div>
+
+                    {/* PART 1: WEIGHT VARIANTS TABLE (Mirrors Dry Fruits UI) */}
+                    {((formData.chocolate_pricing_type || 'weight') === 'weight' || formData.chocolate_pricing_type === 'both') && (
+                      <div className="space-y-3 pt-2 border-t border-amber-200/60">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-amber-700" />
+                            <span className="text-xs font-bold uppercase tracking-wider text-amber-950">
+                              Weight Variants &amp; Pricing (100g, 250g, 500g, etc.)
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleAddChocolatePack}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-amber-900 bg-amber-100 hover:bg-amber-200 active:scale-95 rounded-xl border border-amber-300 transition-all cursor-pointer shrink-0"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            Add Weight Variant
+                          </button>
+                        </div>
+
+                        {(formData.chocolate_pack_options || []).length > 0 ? (
+                          <div className="overflow-x-auto rounded-xl border border-amber-200 bg-white shadow-2xs">
+                            <table className="w-full text-xs text-left">
+                              <thead className="bg-amber-100/70 text-amber-950 font-bold uppercase tracking-wider text-[10px] border-b border-amber-200">
+                                <tr>
+                                  <th className="px-3 py-2.5">#</th>
+                                  <th className="px-3 py-2.5">Pack Weight</th>
+                                  <th className="px-3 py-2.5">Unit (g / kg)</th>
+                                  <th className="px-3 py-2.5">Pack Label</th>
+                                  <th className="px-3 py-2.5">Pack Price (₹)</th>
+                                  <th className="px-3 py-2.5 text-center">Action</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-amber-100">
+                                {(formData.chocolate_pack_options || []).map((pack, idx) => (
+                                  <tr key={idx} className="hover:bg-amber-50/40 transition-colors">
+                                    <td className="px-3 py-2 font-bold text-amber-900">
+                                      Variant {idx + 1}
+                                    </td>
+                                    <td className="px-3 py-2">
+                                      <input
+                                        type="number"
+                                        min="1"
+                                        step="any"
+                                        value={pack.weight}
+                                        onChange={(e) => handleUpdateChocolatePack(idx, 'weight', e.target.value)}
+                                        className="w-24 px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-amber-500 focus:border-amber-500 font-mono"
+                                        placeholder="e.g. 100"
+                                      />
+                                    </td>
+                                    <td className="px-3 py-2">
+                                      <select
+                                        value={pack.unit || 'g'}
+                                        onChange={(e) => handleUpdateChocolatePack(idx, 'unit', e.target.value)}
+                                        className="px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                                      >
+                                        <option value="g">Grams (g)</option>
+                                        <option value="kg">Kilograms (kg)</option>
+                                      </select>
+                                    </td>
+                                    <td className="px-3 py-2">
+                                      <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-amber-100 text-amber-950 font-extrabold text-xs font-mono">
+                                        {pack.weight || 0}{pack.unit || 'g'}
+                                      </span>
+                                    </td>
+                                    <td className="px-3 py-2">
+                                      <div className="relative w-28">
+                                        <span className="absolute inset-y-0 left-0 pl-2 flex items-center text-slate-400 font-bold">₹</span>
+                                        <input
+                                          type="number"
+                                          min="1"
+                                          value={pack.price}
+                                          onChange={(e) => handleUpdateChocolatePack(idx, 'price', e.target.value)}
+                                          className="w-full pl-6 pr-2 py-1.5 rounded-lg border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-amber-500 focus:border-amber-500 font-mono"
+                                          placeholder="Price"
+                                        />
+                                      </div>
+                                    </td>
+                                    <td className="px-3 py-2 text-center">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRemoveChocolatePack(idx)}
+                                        className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors cursor-pointer"
+                                        title="Remove Variant"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </button>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        ) : (
+                          <div className="p-4 rounded-xl bg-white border border-dashed border-amber-300 text-center space-y-2">
+                            <p className="text-xs text-amber-900 font-medium">
+                              No weight variants defined yet. Add variants (e.g. 100g, 250g, 500g) for customers to choose from.
+                            </p>
+                            <button
+                              type="button"
+                              onClick={handleAddChocolatePack}
+                              className="inline-flex items-center gap-1 px-3 py-1.5 bg-amber-900 hover:bg-amber-950 text-white text-xs font-bold rounded-lg cursor-pointer"
+                            >
+                              <Plus className="w-3.5 h-3.5" /> Add First Variant
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Live Customer Preview */}
+                        {(formData.chocolate_pack_options || []).length > 0 && (
+                          <div className="p-3 bg-amber-50/60 rounded-xl border border-amber-200">
+                            <div className="text-[11px] font-bold text-amber-900 mb-1.5 flex items-center gap-1.5">
+                              <span>👀 Customer View Preview:</span>
+                              <span className="text-[10px] font-normal text-amber-800">(Discrete weight variant cards shown to customer)</span>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {(formData.chocolate_pack_options || []).map((p, idx) => (
+                                <div
+                                  key={idx}
+                                  className="px-3 py-1.5 rounded-lg bg-white border border-amber-300 shadow-2xs flex items-center gap-2"
+                                >
+                                  <span className="font-extrabold text-xs text-slate-800 font-mono">
+                                    {p.weight || 0}{p.unit || 'g'}
+                                  </span>
+                                  <span className="text-xs font-black text-amber-800 font-mono">
+                                    ₹{p.price || 0}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* PART 2: PIECE COUNT CONFIGURATION CARD */}
+                    {(formData.chocolate_pricing_type === 'piece' || formData.chocolate_pricing_type === 'both') && (
+                      <div className="space-y-3 pt-2 border-t border-amber-200/60">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-amber-700" />
+                          <span className="text-xs font-bold uppercase tracking-wider text-amber-950">
+                            Piece Count Sale Option (Single pieces: bonbons, bars, truffles)
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500">
+                          Customers will see a piece-count stepper starting at <strong>1 Pc</strong>. Clicking <strong>+</strong> increments by 1 piece. Total price = pieces × unit price.
+                        </p>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl bg-white border border-amber-200">
+                          <div>
+                            <label className="block text-xs font-bold text-slate-700 mb-1">
+                              Default Price per Piece (₹) *
+                            </label>
+                            <div className="relative">
+                              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 font-bold">₹</span>
+                              <input
+                                type="number"
+                                min="1"
+                                value={formData.piece_price || ''}
+                                onChange={(e) => setFormData({ ...formData, piece_price: e.target.value })}
+                                className="w-full pl-7 pr-3 py-2 rounded-lg border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-amber-500 font-mono"
+                                placeholder="e.g. 50"
+                              />
+                            </div>
+                            <p className="text-[10px] text-slate-400 mt-0.5">Price charged for each 1 piece</p>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-bold text-slate-700 mb-1">
+                              Maximum Pieces Allowed per Order
+                            </label>
+                            <input
+                              type="number"
+                              min="1"
+                              value={formData.piece_limit || 20}
+                              onChange={(e) => setFormData({ ...formData, piece_limit: e.target.value })}
+                              className="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-amber-500 font-mono"
+                              placeholder="e.g. 50"
+                            />
+                            <p className="text-[10px] text-slate-400 mt-0.5">Default max: 20 pieces</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* SNACK FLEXIBLE PRICING SECTION */}
-                {!isThemeCakeSelected && !isDessertSelected && !isDryFruitSelected && (
+                {!isThemeCakeSelected && !isDessertSelected && !isDryFruitSelected && !isChocolatesSelected && !isCakesOrSweetsSelected && (
                 <div className="sm:col-span-2">
                   <div className="rounded-2xl border-2 border-amber-300 bg-amber-50/50 p-4 sm:p-5 transition-all shadow-sm">
                     <div className="flex items-center justify-between gap-3 mb-3">
@@ -2342,8 +3200,562 @@ const AdminProductsPage = () => {
                 </div>
                 )}
 
+                {/* CAKE SHAPE OPTIONS & PRICING (Round, Heart, Square) */}
+                {isCakesAndPastriesSelected && (
+                  <div className="sm:col-span-2 bg-gradient-to-br from-pink-50/60 via-amber-50/40 to-white p-4 sm:p-5 rounded-2xl border-2 border-pink-200/80 shadow-sm space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <span className="text-xs font-bold uppercase tracking-wider text-chocolate flex items-center gap-1.5">
+                          <Layers className="w-4 h-4 text-pink-600" />
+                          <span>Cake Shape Options & Egg / Eggless Pricing (Per Kg)</span>
+                        </span>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          Configure each cake shape with separate <strong>Egg price</strong> and <strong>Eggless price</strong> (per kg). Add new shapes, update prices, or delete shapes. Changes update live for customers.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleAddShape}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold shadow-xs transition-all cursor-pointer self-start sm:self-auto shrink-0"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Add New Shape</span>
+                      </button>
+                    </div>
+
+                    {(!formData.shapes || formData.shapes.length === 0) ? (
+                      <div className="p-6 text-center border-2 border-dashed border-pink-200 rounded-xl bg-white/70 space-y-2">
+                        <p className="text-xs font-medium text-slate-500">No cake shapes configured yet for this product.</p>
+                        <button
+                          type="button"
+                          onClick={handleAddShape}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-pink-50 hover:bg-pink-100 text-pink-700 border border-pink-300 text-xs font-bold cursor-pointer transition"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Add Your First Shape</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {formData.shapes.map((shapeItem, idx) => {
+                          const isShapeActive = Boolean(shapeItem.is_active);
+                          const shapeType = (shapeItem.shape || '').toLowerCase();
+                          const shapeIcon = shapeType === 'round' ? '⚪' : shapeType === 'heart' ? '💖' : shapeType === 'square' ? '⬛' : '🎂';
+                          return (
+                            <div
+                              key={shapeItem.id || idx}
+                              className={`p-4 rounded-xl border-2 transition-all flex flex-col justify-between gap-3 ${
+                                isShapeActive
+                                  ? 'bg-white border-pink-300 shadow-xs'
+                                  : 'bg-slate-50/90 border-dashed border-slate-200 opacity-75'
+                              }`}
+                            >
+                              <div className="space-y-3">
+                                {/* Header: Icon + Name + Active + Delete Action */}
+                                <div className="flex items-center justify-between pb-2 border-b border-slate-100 gap-2">
+                                  <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                    <span className="text-base">{shapeIcon}</span>
+                                    <input
+                                      type="text"
+                                      value={shapeItem.name || ''}
+                                      onChange={(e) => handleUpdateShape(idx, 'name', e.target.value)}
+                                      placeholder="Shape Name (e.g. Heart Shape)"
+                                      className="font-bold text-xs text-slate-800 border border-transparent hover:border-slate-200 focus:border-pink-500 rounded px-1.5 py-0.5 w-full focus:outline-none bg-transparent"
+                                      title="Click to edit shape display name"
+                                    />
+                                  </div>
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    <label className="flex items-center gap-1 cursor-pointer text-[11px] font-semibold text-slate-700 select-none">
+                                      <input
+                                        type="checkbox"
+                                        checked={isShapeActive}
+                                        onChange={(e) => handleUpdateShape(idx, 'is_active', e.target.checked)}
+                                        className="w-3.5 h-3.5 rounded text-pink-600 focus:ring-pink-500 border-slate-300 cursor-pointer"
+                                      />
+                                      <span className={isShapeActive ? 'text-pink-700 font-bold' : 'text-slate-400'}>
+                                        {isShapeActive ? 'Active' : 'Off'}
+                                      </span>
+                                    </label>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveShape(idx)}
+                                      className="text-slate-400 hover:text-rose-600 p-1 rounded hover:bg-rose-50 transition cursor-pointer"
+                                      title="Delete shape"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* Shape Type Selector */}
+                                <div className="flex items-center gap-2">
+                                  <label className="text-[10px] font-bold text-slate-500 uppercase shrink-0">Type:</label>
+                                  <select
+                                    value={shapeItem.shape || 'Heart'}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      handleUpdateShape(idx, 'shape', val);
+                                      if (!shapeItem.name || shapeItem.name === 'Custom Shape' || shapeItem.name.includes('Shape')) {
+                                        handleUpdateShape(idx, 'name', `${val} Shape`);
+                                      }
+                                    }}
+                                    className="text-[11px] font-semibold py-1 px-2 rounded-md border border-slate-200 bg-slate-50 text-slate-700 focus:outline-none focus:border-pink-500 w-full"
+                                  >
+                                    <option value="Heart">💖 Heart Shape</option>
+                                    <option value="Round">⚪ Round Shape</option>
+                                    <option value="Square">⬛ Square Shape</option>
+                                    <option value="Rectangle">▭ Rectangle Shape</option>
+                                    <option value="Custom">🎂 Custom Shape</option>
+                                  </select>
+                                </div>
+
+                                {/* Separate Prices: Egg Price & Eggless Price */}
+                                <div className="grid grid-cols-2 gap-2">
+                                  {/* Egg Price */}
+                                  <div>
+                                    <label className="block text-[10px] font-bold text-amber-900 mb-1 flex items-center gap-1">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />
+                                      <span>Egg (₹/kg) {isShapeActive && '*'}</span>
+                                    </label>
+                                    <div className="relative">
+                                      <span className="absolute left-2 top-2 text-xs text-amber-700 font-bold">₹</span>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        value={shapeItem.egg_price ?? ''}
+                                        onChange={(e) => handleUpdateShape(idx, 'egg_price', e.target.value)}
+                                        placeholder="e.g. 650"
+                                        className="w-full pl-5 p-1.5 text-xs font-bold rounded-lg border border-amber-200 bg-amber-50/40 text-amber-950 focus:outline-none focus:border-amber-500 font-mono"
+                                      />
+                                    </div>
+                                    <span className="text-[9px] text-slate-400 mt-0.5 block">With Egg price</span>
+                                  </div>
+
+                                  {/* Eggless Price */}
+                                  <div>
+                                    <label className="block text-[10px] font-bold text-emerald-900 mb-1 flex items-center gap-1">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
+                                      <span>Eggless (₹/kg) {isShapeActive && '*'}</span>
+                                    </label>
+                                    <div className="relative">
+                                      <span className="absolute left-2 top-2 text-xs text-emerald-700 font-bold">₹</span>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        value={shapeItem.eggless_price ?? ''}
+                                        onChange={(e) => handleUpdateShape(idx, 'eggless_price', e.target.value)}
+                                        placeholder="e.g. 700"
+                                        className="w-full pl-5 p-1.5 text-xs font-bold rounded-lg border border-emerald-200 bg-emerald-50/40 text-emerald-950 focus:outline-none focus:border-emerald-500 font-mono"
+                                      />
+                                    </div>
+                                    <span className="text-[9px] text-slate-400 mt-0.5 block">100% Pure Veg</span>
+                                  </div>
+                                </div>
+
+                                {/* Summary Bar */}
+                                <div className="text-[10px] bg-slate-50 p-1.5 rounded border border-slate-200 flex items-center justify-between font-mono">
+                                  <span className="text-slate-600 font-semibold truncate max-w-[90px]">
+                                    {shapeItem.name || shapeItem.shape}
+                                  </span>
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-amber-800 font-bold">Egg: ₹{shapeItem.egg_price || 0}</span>
+                                    <span className="text-slate-300">|</span>
+                                    <span className="text-emerald-800 font-bold">Veg: ₹{shapeItem.eggless_price || 0}</span>
+                                  </div>
+                                </div>
+
+                                {/* Image Preview & Upload */}
+                                <div>
+                                  <label className="block text-[10px] font-bold text-slate-600 mb-1">
+                                    Shape Photo Preview
+                                  </label>
+                                  {shapeItem.image ? (
+                                    <div className="relative group mb-1.5 rounded-lg overflow-hidden border border-slate-200 bg-slate-100 aspect-video flex items-center justify-center">
+                                      <img
+                                        src={formatImageUrl(shapeItem.image)}
+                                        alt={shapeItem.name}
+                                        className="w-full h-full object-cover"
+                                        onError={(e) => {
+                                          e.currentTarget.style.display = 'none';
+                                        }}
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => handleUpdateShape(idx, 'image', '')}
+                                        className="absolute top-1 right-1 bg-rose-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                                        title="Remove image"
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <div className="mb-1.5 p-2 text-center border border-dashed border-slate-200 rounded-lg bg-slate-50 text-[10px] text-slate-400">
+                                      No photo uploaded yet
+                                    </div>
+                                  )}
+
+                                  <div className="flex items-center gap-2">
+                                    <label className="flex-1">
+                                      <input
+                                        type="file"
+                                        accept="image/*"
+                                        className="hidden"
+                                        disabled={uploadingShapeIndex === idx}
+                                        onChange={(e) => {
+                                          if (e.target.files?.[0]) {
+                                            handleShapeImageUpload(idx, e.target.files[0]);
+                                          }
+                                        }}
+                                      />
+                                      <span className="flex items-center justify-center gap-1.5 w-full py-1 px-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-[11px] font-semibold cursor-pointer transition border border-slate-300">
+                                        <Upload className="w-3 h-3 text-slate-500" />
+                                        <span>{uploadingShapeIndex === idx ? 'Uploading...' : 'Upload Photo'}</span>
+                                      </span>
+                                    </label>
+                                  </div>
+                                  <div className="mt-1">
+                                    <input
+                                      type="text"
+                                      value={shapeItem.image || ''}
+                                      onChange={(e) => handleUpdateShape(idx, 'image', e.target.value)}
+                                      placeholder="Or paste image URL"
+                                      className="w-full p-1 text-[10px] rounded border border-slate-200 bg-white text-slate-600 focus:outline-none focus:border-pink-500 font-mono"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* CAKES & PASTRIES AND SWEETS SALE OPTIONS SECTION */}
+                {isCakesOrSweetsSelected && (
+                  <div className="sm:col-span-2 bg-gradient-to-br from-amber-50/70 to-white p-4 sm:p-5 rounded-2xl border-2 border-amber-300 shadow-sm space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <span className="text-xs font-bold uppercase tracking-wider text-chocolate flex items-center gap-1.5">
+                          <Scale className="w-4 h-4 text-amber-700" />
+                          <span>Sale Options ({isSweetsSelected ? 'Sweets' : 'Cakes & Pastries'}) *</span>
+                        </span>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          Enable how customers can purchase this {isSweetsSelected ? 'sweet' : 'cake'}: by <strong>Weight (kg)</strong>, by <strong>Pieces</strong>, or <strong>Both</strong>.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* OPTION 1: SELL BY KG */}
+                      <div className={`p-4 rounded-xl border-2 transition-all ${
+                        formData.sell_by_kg ? 'bg-white border-amber-400 shadow-xs' : 'bg-slate-50/80 border-dashed border-slate-200 opacity-80'
+                      }`}>
+                        <div className="flex items-center justify-between mb-3">
+                          <label className="flex items-center gap-2 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(formData.sell_by_kg)}
+                              onChange={(e) => setFormData({ ...formData, sell_by_kg: e.target.checked })}
+                              className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-slate-300 cursor-pointer"
+                            />
+                            <span className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                              <span>⚖️ Sell by kg</span>
+                            </span>
+                          </label>
+                          {formData.sell_by_kg && (
+                            <span className="text-[10px] font-bold bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full border border-amber-300">Active</span>
+                          )}
+                        </div>
+
+                        {formData.sell_by_kg && (
+                          <div className="space-y-3 pt-2 border-t border-slate-100">
+                            <div className="grid grid-cols-2 gap-2.5">
+                              <div>
+                                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                                  Increment Step *
+                                </label>
+                                <select
+                                  value={formData.kg_step}
+                                  onChange={(e) => setFormData({ ...formData, kg_step: e.target.value })}
+                                  className="w-full p-2 text-xs font-semibold rounded-lg border border-slate-200 bg-white focus:outline-none focus:border-amber-500"
+                                >
+                                  <option value="0.5">0.5 kg</option>
+                                  <option value="1">1 kg</option>
+                                </select>
+                              </div>
+
+                              <div>
+                                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                                  Default (Starting) kg *
+                                </label>
+                                <input
+                                  type="number"
+                                  step="0.5"
+                                  min="0.5"
+                                  value={formData.kg_default}
+                                  onChange={(e) => setFormData({ ...formData, kg_default: e.target.value })}
+                                  placeholder="e.g. 0.5 or 2"
+                                  className="w-full p-2 text-xs font-semibold rounded-lg border border-slate-200 bg-white focus:outline-none focus:border-amber-500 font-mono"
+                                />
+                                <p className="text-[10px] text-slate-400 mt-0.5">Must be multiple of step</p>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2.5">
+                              <div>
+                                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                                  Maximum kg *
+                                </label>
+                                <input
+                                  type="number"
+                                  step="0.5"
+                                  min="0.5"
+                                  value={formData.kg_max}
+                                  onChange={(e) => setFormData({ ...formData, kg_max: e.target.value })}
+                                  placeholder="e.g. 10"
+                                  className="w-full p-2 text-xs font-semibold rounded-lg border border-slate-200 bg-white focus:outline-none focus:border-amber-500 font-mono"
+                                />
+                                <p className="text-[10px] text-slate-400 mt-0.5">Max allowed weight</p>
+                              </div>
+
+                              <div>
+                                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                                  Price per kg (₹) *
+                                </label>
+                                <div className="relative">
+                                  <span className="absolute left-2.5 top-2 text-xs text-slate-400 font-bold">₹</span>
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    value={formData.kg_price}
+                                    onChange={(e) => setFormData({ ...formData, kg_price: e.target.value })}
+                                    placeholder="e.g. 499"
+                                    className="w-full pl-6 p-2 text-xs font-bold rounded-lg border border-slate-200 bg-white focus:outline-none focus:border-amber-500 font-mono"
+                                  />
+                                </div>
+                                <p className="text-[10px] text-slate-400 mt-0.5">Unit price per 1 kg</p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* OPTION 2: SELL BY PIECES */}
+                      <div className={`p-4 rounded-xl border-2 transition-all ${
+                        formData.sell_by_pieces ? 'bg-white border-amber-400 shadow-xs' : 'bg-slate-50/80 border-dashed border-slate-200 opacity-80'
+                      }`}>
+                        <div className="flex items-center justify-between mb-3">
+                          <label className="flex items-center gap-2 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(formData.sell_by_pieces)}
+                              onChange={(e) => setFormData({ ...formData, sell_by_pieces: e.target.checked })}
+                              className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-slate-300 cursor-pointer"
+                            />
+                            <span className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                              <span>🍰 Sell by pieces</span>
+                            </span>
+                          </label>
+                          {formData.sell_by_pieces && (
+                            <span className="text-[10px] font-bold bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full border border-amber-300">Active</span>
+                          )}
+                        </div>
+
+                        {formData.sell_by_pieces && (
+                          <div className="space-y-3 pt-2 border-t border-slate-100">
+                            <div className="grid grid-cols-2 gap-2.5">
+                              <div>
+                                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                                  Default (Starting) pieces *
+                                </label>
+                                <input
+                                  type="number"
+                                  step="1"
+                                  min="1"
+                                  value={formData.piece_default}
+                                  onChange={(e) => setFormData({ ...formData, piece_default: e.target.value })}
+                                  placeholder="e.g. 1"
+                                  className="w-full p-2 text-xs font-semibold rounded-lg border border-slate-200 bg-white focus:outline-none focus:border-amber-500 font-mono"
+                                />
+                                <p className="text-[10px] text-slate-400 mt-0.5">Must be multiple of step</p>
+                              </div>
+
+                              <div>
+                                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                                  Increment Step *
+                                </label>
+                                <input
+                                  type="number"
+                                  step="1"
+                                  min="1"
+                                  value={formData.piece_step}
+                                  onChange={(e) => setFormData({ ...formData, piece_step: e.target.value })}
+                                  placeholder="e.g. 1"
+                                  className="w-full p-2 text-xs font-semibold rounded-lg border border-slate-200 bg-white focus:outline-none focus:border-amber-500 font-mono"
+                                />
+                                <p className="text-[10px] text-slate-400 mt-0.5">+ step per click</p>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2.5">
+                              <div>
+                                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                                  Maximum pieces *
+                                </label>
+                                <input
+                                  type="number"
+                                  step="1"
+                                  min="1"
+                                  value={formData.piece_max}
+                                  onChange={(e) => setFormData({ ...formData, piece_max: e.target.value })}
+                                  placeholder="e.g. 20"
+                                  className="w-full p-2 text-xs font-semibold rounded-lg border border-slate-200 bg-white focus:outline-none focus:border-amber-500 font-mono"
+                                />
+                                <p className="text-[10px] text-slate-400 mt-0.5">Max allowed pieces</p>
+                              </div>
+
+                              <div>
+                                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                                  Price per piece (₹) *
+                                </label>
+                                <div className="relative">
+                                  <span className="absolute left-2.5 top-2 text-xs text-slate-400 font-bold">₹</span>
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    value={formData.piece_price}
+                                    onChange={(e) => setFormData({ ...formData, piece_price: e.target.value })}
+                                    placeholder="e.g. 60"
+                                    className="w-full pl-6 p-2 text-xs font-bold rounded-lg border border-slate-200 bg-white focus:outline-none focus:border-amber-500 font-mono"
+                                  />
+                                </div>
+                                <p className="text-[10px] text-slate-400 mt-0.5">Unit price per piece</p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* NEW FEATURE: FIXED PRICE BY WEIGHT */}
+                    <div className={`p-4 rounded-xl border-2 transition-all ${
+                      formData.enable_fixed_weight_pricing ? 'bg-white border-amber-500 shadow-xs' : 'bg-slate-50/80 border-dashed border-slate-200'
+                    }`}>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                        <div className="flex items-center gap-2">
+                          <label className="flex items-center gap-2 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(formData.enable_fixed_weight_pricing)}
+                              onChange={(e) => setFormData({ ...formData, enable_fixed_weight_pricing: e.target.checked })}
+                              className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-slate-300 cursor-pointer"
+                            />
+                            <span className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                              <span>🏷️ Enable Fixed Weight Pricing</span>
+                            </span>
+                          </label>
+                          {formData.enable_fixed_weight_pricing ? (
+                            <span className="text-[10px] font-bold bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full border border-amber-300">
+                              Active
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-medium bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">
+                              Off (Standard Increments)
+                            </span>
+                          )}
+                        </div>
+
+                        {formData.enable_fixed_weight_pricing && (
+                          <button
+                            type="button"
+                            onClick={handleAddFixedWeightOption}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-chocolate bg-amber-100 hover:bg-amber-200 rounded-lg transition-colors cursor-pointer self-start sm:self-auto shadow-2xs"
+                          >
+                            <Plus className="w-3.5 h-3.5 text-amber-700" />
+                            <span>Add Weight Option</span>
+                          </button>
+                        )}
+                      </div>
+
+                      <p className="text-[11px] text-slate-500 mb-2 leading-relaxed">
+                        When enabled, customers will <strong>only see and pick from these preset weight-price bundles</strong> (e.g. 1 kg → ₹500, 2 kg → ₹940). The regular flexible +/− quantity stepper will be disabled on the customer website.
+                      </p>
+
+                      {formData.enable_fixed_weight_pricing && (
+                        <div className="space-y-3 pt-2 border-t border-slate-100">
+                          {(!formData.fixed_weight_options || formData.fixed_weight_options.length === 0) ? (
+                            <div className="text-center py-5 bg-amber-50/50 rounded-xl border border-dashed border-amber-200 space-y-2">
+                              <p className="text-xs text-amber-800 font-medium">No fixed weight options configured yet.</p>
+                              <button
+                                type="button"
+                                onClick={handleAddFixedWeightOption}
+                                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-white bg-chocolate hover:bg-amber-900 rounded-lg transition-colors cursor-pointer"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                                <span>Add First Weight-Price (e.g. 1 kg → ₹500)</span>
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              <div className="grid grid-cols-12 gap-2 text-[10px] font-bold text-slate-500 uppercase px-1">
+                                <div className="col-span-5">Weight Option (e.g. 1 kg, 2 kg)</div>
+                                <div className="col-span-5">Bundle Price (₹)</div>
+                                <div className="col-span-2 text-right">Action</div>
+                              </div>
+
+                              {formData.fixed_weight_options.map((opt, idx) => (
+                                <div
+                                  key={idx}
+                                  className="grid grid-cols-12 gap-2 items-center p-2.5 bg-slate-50 rounded-xl border border-slate-200"
+                                >
+                                  <div className="col-span-5">
+                                    <input
+                                      type="text"
+                                      value={opt.weight}
+                                      onChange={(e) => handleUpdateFixedWeightOption(idx, 'weight', e.target.value)}
+                                      placeholder="e.g. 1 kg"
+                                      className="w-full p-2 text-xs font-bold rounded-lg border border-slate-200 bg-white focus:outline-none focus:border-amber-500"
+                                    />
+                                  </div>
+
+                                  <div className="col-span-5">
+                                    <div className="relative">
+                                      <span className="absolute left-2.5 top-2 text-xs text-slate-400 font-bold">₹</span>
+                                      <input
+                                        type="number"
+                                        min="1"
+                                        value={opt.price}
+                                        onChange={(e) => handleUpdateFixedWeightOption(idx, 'price', e.target.value)}
+                                        placeholder="e.g. 500"
+                                        className="w-full pl-6 p-2 text-xs font-bold rounded-lg border border-slate-200 bg-white focus:outline-none focus:border-amber-500 font-mono"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  <div className="col-span-2 text-right">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveFixedWeightOption(idx)}
+                                      className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                      title="Remove this weight option"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {/* PORTION & WEIGHT CONFIGURATION SECTION */}
-                {!formData.enable_snack_matrix && !isThemeCakeSelected && !isDessertSelected && !isDryFruitSelected && (
+                {!formData.enable_snack_matrix && !isThemeCakeSelected && !isDessertSelected && !isDryFruitSelected && !isCakesOrSweetsSelected && !isChocolatesSelected && (
                 <div className="sm:col-span-2 bg-gradient-to-br from-amber-50/70 to-white p-4 sm:p-5 rounded-2xl border-2 border-amber-200/80 space-y-4">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>

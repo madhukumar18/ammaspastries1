@@ -312,6 +312,15 @@ const AdminOrdersPage = () => {
                           <span>{formatDate(o.delivery_date)}</span>
                         </div>
                         <div className="text-[10px] text-amber-800 font-semibold">{o.delivery_time_slot}</div>
+                        <div className="mt-1">
+                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${
+                            o.delivery_method === 'pickup'
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              : 'bg-blue-50 text-blue-700 border border-blue-200'
+                          }`}>
+                            {o.delivery_method === 'pickup' ? '🏪 Outlet Pickup' : '🚚 Home Delivery'}
+                          </span>
+                        </div>
                       </td>
 
                       <td className="p-4">
@@ -813,12 +822,12 @@ const AdminOrdersPage = () => {
               {/* Bill Summary & Total */}
               <div className="pt-4 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-200">
                 <div className="flex flex-wrap items-center gap-4 text-xs text-slate-600">
-                  <div>Subtotal: <strong className="text-slate-800">₹{selectedOrder.subtotal}</strong></div>
+                  <div>Cake Price: <strong className="text-slate-800">₹{selectedOrder.subtotal}</strong></div>
                   {Number(selectedOrder.discount) > 0 && (
                     <div className="text-emerald-700 font-semibold">Discount: <strong>-₹{selectedOrder.discount}</strong></div>
                   )}
-                  <div>Delivery Fee: <strong className="text-slate-800">{Number(selectedOrder.delivery_fee) > 0 ? `₹${selectedOrder.delivery_fee}` : 'FREE'}</strong></div>
-                  <div>Tax (5% GST): <strong className="text-slate-800">₹{selectedOrder.tax}</strong></div>
+                  <div>Order Option: <strong className="text-slate-800">{selectedOrder.delivery_method === 'pickup' ? 'Pickup from Outlet' : 'Home Delivery'}</strong></div>
+                  <div>Delivery Charge: <strong className="text-slate-800">{Number(selectedOrder.delivery_fee) > 0 ? `₹${selectedOrder.delivery_fee}` : '₹0 (Free)'}</strong></div>
                 </div>
                 <div className="flex items-center justify-between sm:justify-end gap-4">
                   <div className="text-right">

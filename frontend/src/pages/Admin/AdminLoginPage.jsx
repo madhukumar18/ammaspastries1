@@ -3,11 +3,18 @@ import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import { useApp } from '../../context/AppContext';
 import brandLogo from '../../assets/logo.png';
-import { Lock, Mail, User, ArrowRight, UserPlus, LogIn, KeyRound, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { Lock, Mail, User, ArrowRight, UserPlus, LogIn, KeyRound, ArrowLeft, CheckCircle2, Sparkles } from 'lucide-react';
 
 const AdminLoginPage = () => {
   const navigate = useNavigate();
-  const { loginAdmin, showToast } = useApp();
+  const { adminToken, loginAdmin, showToast } = useApp();
+
+  // If already logged in, automatically proceed to admin dashboard
+  React.useEffect(() => {
+    if (adminToken) {
+      navigate('/admin/dashboard', { replace: true });
+    }
+  }, [adminToken, navigate]);
 
   // Mode: 'login' | 'register' | 'forgot'
   const [mode, setMode] = useState('login');
@@ -33,14 +40,17 @@ const AdminLoginPage = () => {
   const [loading, setLoading] = useState(false);
 
   // --- LOGIN ---
-  const handleAdminLogin = async (e) => {
-    e.preventDefault();
+  const handleAdminLogin = async (e, customEmail = null, customPassword = null) => {
+    if (e && e.preventDefault) e.preventDefault();
     setLoading(true);
+
+    const emailToUse = (customEmail !== null ? customEmail : loginEmail).trim();
+    const passwordToUse = customPassword !== null ? customPassword : loginPassword;
 
     try {
       const res = await api.post('/admin/login', {
-        email: loginEmail.trim(),
-        password: loginPassword,
+        email: emailToUse,
+        password: passwordToUse,
       });
 
       if (res.data?.success) {
@@ -214,6 +224,44 @@ const AdminLoginPage = () => {
         {/* ================= MODE 1: LOGIN ================= */}
         {mode === 'login' && (
           <form onSubmit={handleAdminLogin} className="space-y-4">
+
+            {/* Quick Demo Login Presets for Team / Colleagues */}
+            <div className="p-3.5 bg-gradient-to-br from-amber-50/90 to-orange-50/60 rounded-2xl border border-amber-200/90 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-amber-950 uppercase tracking-wider flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                  Team / Demo Access
+                </span>
+                <span className="text-[10px] text-amber-800 bg-amber-200/70 font-bold px-2 py-0.5 rounded-full">
+                  1-Click Sign In
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 pt-0.5">
+                <button
+                  type="button"
+                  onClick={() => handleAdminLogin(null, 'mkumar200418@gmail.com', 'Admin@123')}
+                  className="p-2.5 bg-white hover:bg-amber-50/80 border border-amber-200/90 hover:border-amber-400 text-left rounded-xl transition-all shadow-2xs cursor-pointer group"
+                >
+                  <div className="text-[11px] font-bold text-chocolate group-hover:text-amber-950 flex items-center gap-1">
+                    <span>👑 Super Admin</span>
+                  </div>
+                  <div className="text-[10px] text-slate-500 truncate">mkumar200418@...</div>
+                  <div className="text-[9px] text-amber-700 font-mono mt-0.5 font-bold">Admin@123</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleAdminLogin(null, 'test1@gmail.com', 'Admin@123')}
+                  className="p-2.5 bg-white hover:bg-amber-50/80 border border-amber-200/90 hover:border-amber-400 text-left rounded-xl transition-all shadow-2xs cursor-pointer group"
+                >
+                  <div className="text-[11px] font-bold text-slate-800 group-hover:text-amber-950 flex items-center gap-1">
+                    <span>🏬 Sub-Admin</span>
+                  </div>
+                  <div className="text-[10px] text-slate-500 truncate">test1@gmail.com</div>
+                  <div className="text-[9px] text-amber-700 font-mono mt-0.5 font-bold">Admin@123</div>
+                </button>
+              </div>
+            </div>
+
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
                 Administrator Email

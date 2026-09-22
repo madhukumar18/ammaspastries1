@@ -28,6 +28,7 @@ import BulkOrderPage from './pages/BulkOrder/BulkOrderPage';
 import FranchisePage from './pages/Franchise/FranchisePage';
 import ContactPage from './pages/Contact/ContactPage';
 import AboutPage from './pages/About/AboutPage';
+import ReviewsPage from './pages/Reviews/ReviewsPage';
 import PolicyPage from './pages/Policy/PolicyPage';
 
 // Admin Pages
@@ -125,6 +126,8 @@ function App() {
             <Route path="/contact" element={<ContactPage />} />
             <Route path="/about-us" element={<AboutPage />} />
             <Route path="/about" element={<AboutPage />} />
+            <Route path="/reviews" element={<ReviewsPage />} />
+            <Route path="/customer-reviews" element={<ReviewsPage />} />
             
             {/* Legal Policies */}
             <Route path="/policies/:slug" element={<PolicyPage />} />

@@ -17,7 +17,7 @@ class AdminBannerController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'title' => 'required|string|max:255',
+            'title' => 'nullable|string|max:255',
             'subtitle' => 'nullable|string|max:500',
             'image_url' => 'required|string',
             'mobile_image_url' => 'nullable|string',
@@ -41,7 +41,7 @@ class AdminBannerController extends Controller
         $banner = Banner::findOrFail($id);
 
         $validated = $request->validate([
-            'title' => 'sometimes|required|string|max:255',
+            'title' => 'nullable|string|max:255',
             'subtitle' => 'nullable|string|max:500',
             'image_url' => 'sometimes|required|string',
             'mobile_image_url' => 'nullable|string',

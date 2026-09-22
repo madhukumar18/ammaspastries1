@@ -38,7 +38,6 @@ const SecondaryNavbar = ({ mobileMenuOpen, setMobileMenuOpen }) => {
       name: 'Photo Cake',
       icon: Sparkles,
       href: '/photo-cake',
-      highlight: true,
     },
     {
       name: 'Snacks',
@@ -185,7 +184,7 @@ const SecondaryNavbar = ({ mobileMenuOpen, setMobileMenuOpen }) => {
                           : 'hover:bg-amber-100/70 hover:text-amber-900'
                       }`}
                     >
-                      {cat.icon && <cat.icon className="w-3.5 h-3.5 shrink-0" />}
+                      {cat.icon && <cat.icon className="w-3.5 h-3.5 text-amber-700 shrink-0" />}
                       <span>{cat.name}</span>
                     </Link>
                   ) : (

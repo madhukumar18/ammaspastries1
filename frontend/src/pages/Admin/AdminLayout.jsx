@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Link, Outlet, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import api from '../../services/api';
 import { useApp } from '../../context/AppContext';
 import brandLogo from '../../assets/logo.png';
@@ -119,8 +119,7 @@ const AdminLayout = () => {
 
   // Protected route check
   if (!adminToken) {
-    navigate('/admin/login');
-    return null;
+    return <Navigate to="/admin/login" replace />;
   }
 
   const allNavItems = [
@@ -145,16 +144,18 @@ const AdminLayout = () => {
     { label: 'Content & Settings', path: '/admin/settings', icon: Settings, module: 'settings', superOnly: true },
   ];
 
-  const navItems = allNavItems.filter((item) => {
-    if (item.superOnly && !isSuperAdmin) return false;
-    return hasPermission(item.module);
-  });
+  const navItems = React.useMemo(() => {
+    return allNavItems.filter((item) => {
+      if (item.superOnly && !isSuperAdmin) return false;
+      return hasPermission(item.module);
+    });
+  }, [isSuperAdmin, admin?.permissions]);
 
   // Smart landing redirect: if sub-admin lands on /admin or an unauthorized route, navigate to their first allowed page
   React.useEffect(() => {
     if (!adminToken) return;
     if (location.pathname === '/admin' || location.pathname === '/admin/') {
-      const target = navItems[0]?.path || '/admin/login';
+      const target = navItems[0]?.path || '/admin/dashboard';
       navigate(target, { replace: true });
     }
   }, [location.pathname, navItems, adminToken, navigate]);

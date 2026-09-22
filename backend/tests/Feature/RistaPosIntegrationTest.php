@@ -52,7 +52,7 @@ class RistaPosIntegrationTest extends TestCase
 
         $response->assertOk()
             ->assertJsonPath('success', true)
-            ->assertJsonPath('data.config.api_key', '761129c2-9fa5-416b-9cb4-333741520e8e')
+            ->assertJsonPath('data.config.api_key', env('RISTA_API_KEY', 'e6bcbfc2-b24a-4026-80ea-1674e920d50d'))
             ->assertJsonStructure([
                 'data' => [
                     'config' => ['base_url', 'api_key', 'api_secret_masked', 'auto_sync'],
@@ -82,11 +82,13 @@ class RistaPosIntegrationTest extends TestCase
     public function test_rista_pos_service_pushes_order_and_records_payload(): void
     {
         Http::fake([
-            '*/orders' => Http::response([
-                'success' => true,
-                'order_id' => 'RSTA_ORD_98765',
-                'message' => 'Order created in POS terminal',
-            ], 200),
+            '*' => Http::response([
+                'branchName' => 'Test',
+                'branchCode' => 'Test',
+                'invoiceNumber' => 'RSTA_ORD_98765',
+                'status' => 'Open',
+                'fulfillmentStatus' => 'Created',
+            ], 201),
         ]);
 
         $order = Order::create([
@@ -102,8 +104,8 @@ class RistaPosIntegrationTest extends TestCase
             'subtotal' => 650.00,
             'discount' => 0.00,
             'delivery_fee' => 50.00,
-            'tax' => 32.50,
-            'total' => 732.50,
+            'tax' => 0.00,
+            'total' => 700.00,
             'payment_status' => 'paid',
             'order_status' => 'confirmed',
             'delivery_date' => now()->addDay()->toDateString(),
@@ -121,18 +123,20 @@ class RistaPosIntegrationTest extends TestCase
         $this->assertEquals('synced', $order->pos_sync_status);
         $this->assertEquals('RSTA_ORD_98765', $order->pos_order_id);
         $this->assertNotNull($order->pos_synced_at);
-        $this->assertEquals('RSTA_STORE_101', $order->pos_payload['store_id']);
         $this->assertEquals('Aditi Sharma', $order->pos_payload['customer']['name']);
-        $this->assertEquals(732.50, $order->pos_payload['payment']['amount']);
+        $this->assertEquals(700.00, $order->pos_payload['payments'][0]['amount']);
     }
 
     public function test_admin_can_trigger_manual_order_sync(): void
     {
         Http::fake([
-            '*/orders' => Http::response([
-                'success' => true,
-                'order_id' => 'RSTA_MANUAL_123',
-            ], 200),
+            '*' => Http::response([
+                'branchName' => 'Test',
+                'branchCode' => 'Test',
+                'invoiceNumber' => 'RSTA_MANUAL_123',
+                'status' => 'Open',
+                'fulfillmentStatus' => 'Created',
+            ], 201),
         ]);
 
         $order = Order::create([

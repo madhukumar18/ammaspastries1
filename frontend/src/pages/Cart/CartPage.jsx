@@ -34,10 +34,9 @@ const CartPage = () => {
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [validatingCoupon, setValidatingCoupon] = useState(false);
 
-  // Delivery Fee: Free above 1000, else 50
-  const deliveryFee = cartSubtotal >= 1000 || cartSubtotal === 0 ? 0 : 50;
-  const tax = roundToTwo((cartSubtotal - couponDiscount) * 0.05);
-  const finalTotal = Math.max(0, cartSubtotal - couponDiscount + deliveryFee + tax);
+  // Delivery charge is selected at checkout (Home Delivery: ₹100, Outlet Pickup: ₹0)
+  // GST is completely removed: Final price = admin-set price × weight/quantity
+  const finalTotal = Math.max(0, cartSubtotal - couponDiscount);
 
   const [relatedProducts, setRelatedProducts] = useState([]);
 
@@ -150,6 +149,7 @@ const CartPage = () => {
             const hasCustomization = Boolean(item.customization);
             const isPhotoCake = item.customization?.is_photo_cake;
             const itemImage = formatImageUrl(
+              item.customization?.shape_image ||
               item.customization?.photo_preview_url ||
               item.product.image_url,
               'https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=200'
@@ -180,7 +180,15 @@ const CartPage = () => {
                     <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
                       {item.variant && (
                         <span className="bg-slate-100 px-2 py-0.5 rounded-md font-semibold text-chocolate">
-                          Size: {item.variant.size_weight}
+                          {item.customization?.product_type === 'chocolate' || item.customization?.product_type === 'dry_fruit'
+                            ? `${item.variant.size_weight}`
+                            : `Size: ${item.variant.size_weight}`}
+                        </span>
+                      )}
+                      {item.customization?.shape && (
+                        <span className="bg-pink-50 text-pink-800 border border-pink-200 px-2 py-0.5 rounded-md font-medium flex items-center gap-1">
+                          <span>Shape:</span>
+                          <strong className="font-bold">{item.customization.shape}</strong>
                         </span>
                       )}
                       {item.customization?.flavour && (
@@ -327,25 +335,11 @@ const CartPage = () => {
                 </div>
               )}
 
-              <div className="flex justify-between">
-                <span>Delivery Fee</span>
-                <span>
-                  {deliveryFee === 0 ? (
-                    <strong className="text-emerald-600 uppercase text-[11px]">FREE</strong>
-                  ) : (
-                    `₹${deliveryFee}`
-                  )}
+              <div className="flex justify-between items-center text-xs">
+                <span>Delivery Option</span>
+                <span className="text-[11px] font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
+                  Chosen at Checkout (₹100 / Free)
                 </span>
-              </div>
-              {cartSubtotal < 1000 && (
-                <div className="text-[10px] text-amber-700 italic">
-                  Add ₹{1000 - cartSubtotal} more for FREE doorstep delivery!
-                </div>
-              )}
-
-              <div className="flex justify-between">
-                <span>GST (5%)</span>
-                <span>₹{tax}</span>
               </div>
 
               <div className="pt-3 border-t border-slate-200 flex justify-between text-base font-bold text-chocolate">

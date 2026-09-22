@@ -267,7 +267,9 @@ const AdminBannersPage = () => {
                     <span className="text-xs uppercase tracking-wider text-cream-200 font-semibold mb-1">
                       Display Order: #{banner.display_order}
                     </span>
-                    <h3 className="font-banner font-bold text-xl leading-tight mb-1">{banner.title}</h3>
+                    <h3 className="font-banner font-bold text-xl leading-tight mb-1">
+                      {banner.title || <span className="text-cream-300 italic text-sm font-normal">(Graphic Banner — No Text Overlay)</span>}
+                    </h3>
                     {banner.subtitle && <p className="text-xs text-cream-200 line-clamp-2 font-banner">{banner.subtitle}</p>}
                   </div>
 
@@ -289,7 +291,7 @@ const AdminBannersPage = () => {
                     <div className="flex items-center gap-1.5">
                       <span className="font-semibold text-gray-800">CTA Button:</span>
                       <span className="bg-cream-100 px-2 py-0.5 rounded text-bakery-800 font-medium">
-                        {banner.button_text || 'None'}
+                        {banner.button_text || <span className="text-gray-400 italic font-normal">None (No Button)</span>}
                       </span>
                     </div>
                     <div className="flex items-center gap-1 text-gray-500 truncate max-w-[200px]">
@@ -356,19 +358,22 @@ const AdminBannersPage = () => {
             <form onSubmit={handleSubmit} className="space-y-5 text-xs">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="sm:col-span-2">
-                  <label className="block font-semibold text-gray-700 mb-1">Headline / Title *</label>
+                  <label className="block font-semibold text-gray-700 mb-1">
+                    Headline / Title <span className="text-gray-400 font-normal">(Optional — leave empty if your banner image already has text)</span>
+                  </label>
                   <input
                     type="text"
-                    required
                     value={formData.title}
                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    placeholder="e.g. Artisanal Cakes Baked Fresh Every Morning"
+                    placeholder="e.g. Artisanal Cakes Baked Fresh Every Morning (or leave empty)"
                     className="w-full px-3 py-2 border border-cream-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-bakery-500"
                   />
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="block font-semibold text-gray-700 mb-1">Subtitle / Tagline</label>
+                  <label className="block font-semibold text-gray-700 mb-1">
+                    Subtitle / Tagline <span className="text-gray-400 font-normal">(Optional)</span>
+                  </label>
                   <textarea
                     rows={2}
                     value={formData.subtitle}
@@ -379,18 +384,22 @@ const AdminBannersPage = () => {
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-gray-700 mb-1">Button Text</label>
+                  <label className="block font-semibold text-gray-700 mb-1">
+                    Button Text <span className="text-gray-400 font-normal">(Optional — leave empty to hide button)</span>
+                  </label>
                   <input
                     type="text"
                     value={formData.button_text}
                     onChange={(e) => setFormData({ ...formData, button_text: e.target.value })}
-                    placeholder="Order Fresh"
+                    placeholder="e.g. Order Fresh (leave blank for no button)"
                     className="w-full px-3 py-2 border border-cream-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-bakery-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-gray-700 mb-1">Button Link / Route</label>
+                  <label className="block font-semibold text-gray-700 mb-1">
+                    Button Link / Route <span className="text-gray-400 font-normal">(Optional)</span>
+                  </label>
                   <input
                     type="text"
                     value={formData.button_url}

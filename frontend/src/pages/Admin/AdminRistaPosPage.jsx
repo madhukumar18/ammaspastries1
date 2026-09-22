@@ -233,6 +233,8 @@ const AdminRistaPosPage = () => {
     } catch (err) {
       setTestResult({
         success: false,
+        gateway_url: config?.base_url || 'https://api.ristaapps.com/v1',
+        api_key_masked: config?.api_key ? (config.api_key.slice(0, 6) + '...' + config.api_key.slice(-4)) : 'Configured',
         message: err.response?.data?.message || err.message,
       });
       showToast('Connection attempt encountered an error', 'error');
@@ -809,26 +811,52 @@ const AdminRistaPosPage = () => {
 
                           <td className="py-3.5 px-4 font-mono text-xs text-slate-600">
                             {order.pos_order_id ? (
-                              <span className="bg-slate-100 px-2 py-0.5 rounded font-bold text-slate-700">
-                                {order.pos_order_id}
-                              </span>
+                              <div className="flex flex-col gap-1">
+                                <span className="bg-slate-100 px-2 py-0.5 rounded font-bold text-slate-700 w-fit">
+                                  {order.pos_order_id}
+                                </span>
+                                {order.pos_response?.url && (
+                                  <a
+                                    href={order.pos_response.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-[11px] text-bakery-600 hover:text-bakery-800 flex items-center gap-1 font-sans font-bold"
+                                  >
+                                    <ExternalLink className="w-3 h-3" />
+                                    <span>Open POS Bill</span>
+                                  </a>
+                                )}
+                              </div>
                             ) : (
                               <span className="text-slate-300">—</span>
                             )}
                           </td>
 
                           <td className="py-3.5 px-4 text-right">
-                            <button
-                              onClick={() => {
-                                setPayloadModalOrder(order);
-                                setModalTab('curl');
-                              }}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-cream-300 bg-white hover:bg-cream-100 text-chocolate font-bold text-xs transition-colors cursor-pointer shadow-2xs"
-                              title="Inspect POS Payload & cURL Command"
-                            >
-                              <Eye className="w-3.5 h-3.5 text-bakery-600" />
-                              <span>View Details</span>
-                            </button>
+                            <div className="flex items-center justify-end gap-2">
+                              {!isSynced && (
+                                <button
+                                  onClick={() => handleSyncOrder(order.id)}
+                                  disabled={syncingOrderId === order.id}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs transition-colors cursor-pointer shadow-xs disabled:opacity-50"
+                                  title="Push order to Rista POS"
+                                >
+                                  <Send className={`w-3.5 h-3.5 ${syncingOrderId === order.id ? 'animate-spin' : ''}`} />
+                                  <span>{syncingOrderId === order.id ? 'Syncing...' : 'Sync to POS'}</span>
+                                </button>
+                              )}
+                              <button
+                                onClick={() => {
+                                  setPayloadModalOrder(order);
+                                  setModalTab('curl');
+                                }}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-cream-300 bg-white hover:bg-cream-100 text-chocolate font-bold text-xs transition-colors cursor-pointer shadow-2xs"
+                                title="Inspect POS Payload & cURL Command"
+                              >
+                                <Eye className="w-3.5 h-3.5 text-bakery-600" />
+                                <span>Details</span>
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -999,19 +1027,48 @@ const AdminRistaPosPage = () => {
             </div>
 
             {/* Modal Footer */}
-            <div className="p-4 border-t border-slate-100 flex items-center justify-between bg-slate-50">
-              <span className="text-xs text-slate-500 font-sans">
-                Status:{' '}
-                <strong className={payloadModalOrder.pos_synced ? 'text-emerald-600' : 'text-amber-600'}>
-                  {payloadModalOrder.pos_sync_status?.toUpperCase()}
-                </strong>
-              </span>
-              <button
-                onClick={() => setPayloadModalOrder(null)}
-                className="px-4 py-2 bg-chocolate text-white rounded-xl text-xs font-bold hover:bg-opacity-90 cursor-pointer"
-              >
-                Close Details
-              </button>
+            <div className="p-4 border-t border-slate-100 flex items-center justify-between bg-slate-50 flex-wrap gap-2">
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-slate-500 font-sans">
+                  Status:{' '}
+                  <strong className={payloadModalOrder.pos_synced ? 'text-emerald-600' : 'text-amber-600'}>
+                    {payloadModalOrder.pos_sync_status?.toUpperCase()}
+                  </strong>
+                </span>
+                {payloadModalOrder.pos_response?.url && (
+                  <a
+                    href={payloadModalOrder.pos_response.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-bakery-600 hover:text-bakery-800 font-bold flex items-center gap-1 font-sans"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>Open Live POS Order</span>
+                  </a>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                {!payloadModalOrder.pos_synced && (
+                  <button
+                    onClick={async () => {
+                      const orderId = payloadModalOrder.id;
+                      await handleSyncOrder(orderId);
+                      setPayloadModalOrder(null);
+                    }}
+                    disabled={syncingOrderId === payloadModalOrder.id}
+                    className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs disabled:opacity-50"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>{syncingOrderId === payloadModalOrder.id ? 'Pushing...' : 'Push to POS Terminal'}</span>
+                  </button>
+                )}
+                <button
+                  onClick={() => setPayloadModalOrder(null)}
+                  className="px-4 py-2 bg-chocolate text-white rounded-xl text-xs font-bold hover:bg-opacity-90 cursor-pointer"
+                >
+                  Close Details
+                </button>
+              </div>
             </div>
           </div>
         </div>

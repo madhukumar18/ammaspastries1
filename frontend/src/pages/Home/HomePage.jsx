@@ -16,8 +16,6 @@ import {
   Award,
   ArrowRight,
   HeartHandshake,
-  Cake,
-  Globe2,
   CheckCircle2,
   Crown
 } from 'lucide-react';
@@ -93,7 +91,6 @@ const HomePage = () => {
   const [newArrivals, setNewArrivals] = useState([]);
   const [mostPopular, setMostPopular] = useState([]);
   const [themeCakes, setThemeCakes] = useState([]);
-  const [countries, setCountries] = useState([]);
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -116,7 +113,6 @@ const HomePage = () => {
           api.get('/dream-cake'),
           api.get('/new-arrivals'),
           api.get('/most-popular'),
-          api.get('/content/countries'),
           api.get('/reviews?featured=1'),
           api.get('/products?category=theme-cakes&limit=4'),
         ]);
@@ -138,9 +134,6 @@ const HomePage = () => {
         }
         if (themeCakesRes.status === 'fulfilled' && themeCakesRes.value.data?.data) {
           setThemeCakes(themeCakesRes.value.data.data);
-        }
-        if (countriesRes.status === 'fulfilled' && countriesRes.value.data?.data) {
-          setCountries(countriesRes.value.data.data);
         }
         if (reviewsRes.status === 'fulfilled' && reviewsRes.value.data?.data) {
           setReviews(reviewsRes.value.data.data);
@@ -202,29 +195,47 @@ const HomePage = () => {
                       className="w-full h-full object-cover object-[center_28%] sm:object-[center_22%]"
                     />
                   </picture>
-                  <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/65 sm:via-black/50 to-black/20 sm:to-transparent flex items-center">
-                    <div
-                      key={`${banner.id || idx}-${idx === currentBanner ? 'active' : 'inactive'}`}
-                      className="max-w-xl p-4 sm:p-7 md:p-10 lg:p-6 xl:p-10 text-white space-y-2 sm:space-y-3 lg:space-y-2.5 xl:space-y-4 font-banner"
-                    >
-                      <span className="inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-bold text-[10px] sm:text-xs uppercase tracking-widest px-3 py-0.5 sm:px-3.5 sm:py-1 rounded-full backdrop-blur-xs shadow-md animate-banner-badge font-banner">
-                        <Sparkles className="w-3.5 h-3.5 animate-pulse text-amber-200" /> Handcrafted Daily
-                      </span>
-                      <BannerTypewriter text={banner.title} isActive={idx === currentBanner} />
-                      <p className="text-xs sm:text-sm lg:text-xs xl:text-base text-slate-200 leading-relaxed max-w-md line-clamp-2 font-medium drop-shadow-sm animate-banner-subtitle font-banner">
-                        {banner.subtitle}
-                      </p>
-                      <div className="pt-0.5 sm:pt-1">
-                        <Link
-                          to={banner.button_url || '/category/cakes-pastries'}
-                          className="inline-flex items-center gap-2 bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 bg-[length:200%_auto] hover:bg-right hover:scale-105 text-chocolate font-extrabold text-xs sm:text-sm lg:text-xs xl:text-sm px-4 sm:px-6 lg:px-5 xl:px-6 py-2 sm:py-2.5 lg:py-2 xl:py-2.5 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 animate-banner-btn group font-banner"
-                        >
-                          <span>{banner.button_text || 'Order Now'}</span>
-                          <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 group-hover:translate-x-1.5 transition-transform" />
-                        </Link>
+                  {/* If banner has text (title, subtitle, or button), display overlay with typography */}
+                  {(banner.title?.trim() || banner.subtitle?.trim() || banner.button_text?.trim()) ? (
+                    <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/65 sm:via-black/50 to-black/20 sm:to-transparent flex items-center">
+                      <div
+                        key={`${banner.id || idx}-${idx === currentBanner ? 'active' : 'inactive'}`}
+                        className="max-w-xl p-4 sm:p-7 md:p-10 lg:p-6 xl:p-10 text-white space-y-2 sm:space-y-3 lg:space-y-2.5 xl:space-y-4 font-banner"
+                      >
+                        {banner.title?.trim() && (
+                          <>
+                            <span className="inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-bold text-[10px] sm:text-xs uppercase tracking-widest px-3 py-0.5 sm:px-3.5 sm:py-1 rounded-full backdrop-blur-xs shadow-md animate-banner-badge font-banner">
+                              <Sparkles className="w-3.5 h-3.5 animate-pulse text-amber-200" /> Handcrafted Daily
+                            </span>
+                            <BannerTypewriter text={banner.title} isActive={idx === currentBanner} />
+                          </>
+                        )}
+                        {banner.subtitle?.trim() && (
+                          <p className="text-xs sm:text-sm lg:text-xs xl:text-base text-slate-200 leading-relaxed max-w-md line-clamp-2 font-medium drop-shadow-sm animate-banner-subtitle font-banner">
+                            {banner.subtitle}
+                          </p>
+                        )}
+                        {banner.button_text?.trim() && (
+                          <div className="pt-0.5 sm:pt-1">
+                            <Link
+                              to={banner.button_url || '/category/cakes-pastries'}
+                              className="inline-flex items-center gap-2 bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 bg-[length:200%_auto] hover:bg-right hover:scale-105 text-chocolate font-extrabold text-xs sm:text-sm lg:text-xs xl:text-sm px-4 sm:px-6 lg:px-5 xl:px-6 py-2 sm:py-2.5 lg:py-2 xl:py-2.5 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 animate-banner-btn group font-banner"
+                            >
+                              <span>{banner.button_text}</span>
+                              <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 group-hover:translate-x-1.5 transition-transform" />
+                            </Link>
+                          </div>
+                        )}
                       </div>
                     </div>
-                  </div>
+                  ) : banner.button_url?.trim() ? (
+                    /* Pure graphic banner without text: make the entire banner clickable if a link exists */
+                    <Link
+                      to={banner.button_url}
+                      className="absolute inset-0 z-10"
+                      aria-label={banner.title || 'Promotional banner'}
+                    />
+                  ) : null}
                 </div>
               ))}
 
@@ -273,53 +284,7 @@ const HomePage = () => {
 
       <div className="space-y-12 sm:space-y-20 mt-8 sm:mt-14">
 
-      {/* 3. ATTRACTIVE CAKE INTRODUCTION */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-gradient-to-br from-cream via-amber-50/50 to-cream rounded-3xl p-8 sm:p-12 md:p-16 border border-amber-200/60 shadow-warm relative overflow-hidden">
-          <div className="absolute -right-16 -top-16 w-64 h-64 bg-amber-200/30 rounded-full blur-3xl pointer-events-none" />
-          <div className="max-w-3xl mx-auto text-center space-y-5">
-            <div className="inline-flex items-center gap-2 text-amber-700 bg-amber-100/70 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest">
-              <Cake className="w-4 h-4" /> Artisanal Bakery Craftsmanship
-            </div>
-            <h2 className="font-serif text-3xl sm:text-4xl md:text-5xl font-bold text-chocolate leading-tight">
-              Freshly Baked. Beautifully Crafted. Made With Love.
-            </h2>
-            <p className="text-slate-600 text-sm sm:text-base leading-relaxed">
-              From everyday celebrations to unforgettable moments, Ammas Pastries brings freshly crafted cakes,
-              European-style pastries and oven-warm treats directly to your doorstep in 45 minutes to 1 hour.
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 pt-6 text-left">
-              <div className="bg-white/80 backdrop-blur-xs p-5 rounded-2xl border border-amber-100 shadow-2xs">
-                <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold mb-3">
-                  🥛
-                </div>
-                <h3 className="font-bold text-sm text-chocolate mb-1">100% Pure Dairy Cream</h3>
-                <p className="text-xs text-slate-500 leading-normal">
-                  Zero artificial palm fats or vegetable shortening. Only authentic fresh dairy cream.
-                </p>
-              </div>
-              <div className="bg-white/80 backdrop-blur-xs p-5 rounded-2xl border border-amber-100 shadow-2xs">
-                <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold mb-3">
-                  🌱
-                </div>
-                <h3 className="font-bold text-sm text-chocolate mb-1">100% Eggless Choices</h3>
-                <p className="text-xs text-slate-500 leading-normal">
-                  Fluffy, light and moist vegetarian sponges baked in certified separate bakery kitchens.
-                </p>
-              </div>
-              <div className="bg-white/80 backdrop-blur-xs p-5 rounded-2xl border border-amber-100 shadow-2xs">
-                <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold mb-3">
-                  ⚡
-                </div>
-                <h3 className="font-bold text-sm text-chocolate mb-1">45-Min Express Delivery</h3>
-                <p className="text-xs text-slate-500 leading-normal">
-                  Chilled cake carriers and dedicated riders ensure your cakes arrive intact and ready to cut.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+
 
       {/* 3. POPULAR IN GIFTING */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -345,13 +310,13 @@ const HomePage = () => {
         </div>
 
         {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 lg:gap-6">
             {[...Array(4)].map((_, i) => (
               <ProductCardSkeleton key={i} />
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 lg:gap-6">
             {giftingProducts.slice(0, 4).map((product) => (
               <ProductCard key={product.id} product={product} />
             ))}
@@ -441,13 +406,13 @@ const HomePage = () => {
         </div>
 
         {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 lg:gap-6">
             {[...Array(4)].map((_, i) => (
               <ProductCardSkeleton key={i} />
             ))}
           </div>
         ) : themeCakes.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 lg:gap-6">
             {themeCakes.slice(0, 4).map((product) => (
               <ProductCard key={product.id} product={product} />
             ))}
@@ -502,7 +467,7 @@ const HomePage = () => {
         </div>
 
         {/* Dynamic Catalog Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 lg:gap-6">
           {(latestActiveTab === 'new' ? newArrivals : mostPopular).slice(0, 8).map((product) => (
             <ProductCard key={product.id} product={product} />
           ))}
@@ -519,54 +484,7 @@ const HomePage = () => {
         </div>
       </section>
 
-      {/* 6. GIFT CAKE FROM ABROAD TO INDIA */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-gradient-to-r from-amber-900 via-chocolate to-amber-950 text-white rounded-3xl p-8 sm:p-12 shadow-warm border border-amber-700/40 relative overflow-hidden">
-          <div className="max-w-3xl mx-auto text-center space-y-4 mb-8">
-            <div className="inline-flex items-center gap-2 bg-white/10 text-amber-300 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest backdrop-blur-xs">
-              <Globe2 className="w-4 h-4 text-amber-400" /> Global Delivery Support
-            </div>
-            <h2 className="font-serif text-2xl sm:text-3xl md:text-4xl font-bold text-amber-100">
-              Gift Cake From Abroad to any of our Location in India
-            </h2>
-            <p className="text-slate-300 text-xs sm:text-sm max-w-xl mx-auto">
-              Living in USA, UK, Canada, Australia, UAE or anywhere in the world? Send fresh celebratory cakes and treats to your loved ones in Bengaluru with seamless international Razorpay checkout.
-            </p>
-          </div>
 
-          {/* Country Cards Carousel */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 sm:gap-4">
-            {(countries.length > 0 ? countries : [
-              { name: 'USA', flag_image: '🇺🇸', currency_label: 'USD ($)' },
-              { name: 'UK', flag_image: '🇬🇧', currency_label: 'GBP (£)' },
-              { name: 'Canada', flag_image: '🇨🇦', currency_label: 'CAD ($)' },
-              { name: 'Australia', flag_image: '🇦🇺', currency_label: 'AUD ($)' },
-              { name: 'UAE', flag_image: '🇦🇪', currency_label: 'AED (د.إ)' },
-              { name: 'Singapore', flag_image: '🇸🇬', currency_label: 'SGD ($)' },
-              { name: 'Germany', flag_image: '🇩🇪', currency_label: 'EUR (€)' },
-            ]).map((country, idx) => (
-              <div
-                key={idx}
-                className="bg-white/10 hover:bg-white/20 backdrop-blur-md p-3.5 rounded-2xl border border-white/10 text-center transition-all hover:scale-105"
-              >
-                <div className="text-3xl mb-1">{country.flag_image}</div>
-                <div className="text-xs font-bold text-white">{country.name}</div>
-                <div className="text-[10px] text-amber-300 mt-0.5">{country.currency_label || 'Accepted'}</div>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-8 text-center">
-            <Link
-              to="/category/cakes-pastries"
-              className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-chocolate font-bold text-xs sm:text-sm px-6 py-3 rounded-full transition-all shadow-md"
-            >
-              <span>Send A Cake To India Now</span>
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
-        </div>
-      </section>
 
       {/* 7. WHY CHOOSE AMMAS PASTRIES */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -607,9 +525,13 @@ const HomePage = () => {
                 </div>
               )}
             </div>
-            <div className="pt-4 mt-4 border-t border-slate-100">
-              <Link to="/about-us" className="text-xs font-semibold text-amber-700 hover:text-amber-800 flex items-center gap-1">
-                Read Verified Stories →
+            <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between">
+              <Link to="/reviews" className="text-xs font-bold text-amber-700 hover:text-amber-800 flex items-center gap-1 hover:underline">
+                <span>View All Customer Reviews</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+              <Link to="/about-us" className="text-[11px] text-slate-400 hover:text-amber-700">
+                Our Story
               </Link>
             </div>
           </div>

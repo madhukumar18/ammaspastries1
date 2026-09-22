@@ -20,6 +20,7 @@ class Order extends Model
         'delivery_area',
         'delivery_city',
         'delivery_pincode',
+        'delivery_method',
         'subtotal',
         'discount',
         'delivery_fee',

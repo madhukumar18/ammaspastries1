@@ -206,6 +206,54 @@ class AdminFeaturesTest extends TestCase
         ]);
     }
 
+    public function test_admin_can_create_and_update_banner_without_text_or_button(): void
+    {
+        $payload = [
+            'title' => null,
+            'subtitle' => null,
+            'image_url' => 'https://example.com/pure-graphic-banner.jpg',
+            'mobile_image_url' => null,
+            'button_text' => null,
+            'button_url' => null,
+            'display_order' => 2,
+            'is_active' => true,
+        ];
+
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->postJson('/api/admin/banners', $payload);
+
+        $response->assertStatus(201)
+            ->assertJson([
+                'success' => true,
+            ]);
+
+        $bannerId = $response->json('data.id');
+
+        $this->assertDatabaseHas('banners', [
+            'id' => $bannerId,
+            'title' => null,
+            'button_text' => null,
+            'image_url' => 'https://example.com/pure-graphic-banner.jpg',
+        ]);
+
+        // Update banner setting button_text and subtitle to null
+        $updateResponse = $this->actingAs($this->admin, 'sanctum')
+            ->putJson("/api/admin/banners/{$bannerId}", [
+                'button_text' => null,
+                'subtitle' => null,
+            ]);
+
+        $updateResponse->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+            ]);
+
+        $this->assertDatabaseHas('banners', [
+            'id' => $bannerId,
+            'button_text' => null,
+        ]);
+    }
+
     public function test_admin_can_preview_and_download_photo_cake_for_kitchen(): void
     {
         Storage::fake('local');

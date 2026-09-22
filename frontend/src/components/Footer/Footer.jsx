@@ -98,6 +98,11 @@ const Footer = () => {
                 </Link>
               </li>
               <li>
+                <Link to="/reviews" className="hover:text-white hover:underline transition-colors">
+                  Customer Reviews
+                </Link>
+              </li>
+              <li>
                 <Link to="/bulk-order" className="hover:text-white hover:underline transition-colors">
                   Corporate & Bulk Order
                 </Link>

@@ -49,6 +49,19 @@ class Product extends Model
         'dessert_step_size',
         'dessert_price_tiers',
         'dry_fruit_pack_options',
+        'chocolate_pack_options',
+        'chocolate_pricing_type',
+        'sell_by_kg',
+        'kg_step',
+        'kg_default',
+        'kg_max',
+        'kg_price',
+        'sell_by_pieces',
+        'piece_default',
+        'piece_step',
+        'piece_max',
+        'enable_fixed_weight_pricing',
+        'fixed_weight_options',
     ];
 
     protected function casts(): array
@@ -68,6 +81,7 @@ class Product extends Model
             'is_new_arrival' => 'boolean',
             'is_gifting' => 'boolean',
             'stock' => 'integer',
+            'shapes' => 'array',
             'flavours' => 'array',
             'cupcake_variants' => 'array',
             'snack_variants' => 'array',
@@ -80,6 +94,19 @@ class Product extends Model
             'dessert_step_size' => 'integer',
             'dessert_price_tiers' => 'array',
             'dry_fruit_pack_options' => 'array',
+            'chocolate_pack_options' => 'array',
+            'chocolate_pricing_type' => 'string',
+            'sell_by_kg' => 'boolean',
+            'kg_step' => 'float',
+            'kg_default' => 'float',
+            'kg_max' => 'float',
+            'kg_price' => 'float',
+            'sell_by_pieces' => 'boolean',
+            'piece_default' => 'integer',
+            'piece_step' => 'integer',
+            'piece_max' => 'integer',
+            'enable_fixed_weight_pricing' => 'boolean',
+            'fixed_weight_options' => 'array',
         ];
     }
 
@@ -187,6 +214,81 @@ class Product extends Model
     }
 
     /**
+     * Check if product belongs to Chocolates category
+     */
+    public function isChocolate(): bool
+    {
+        return ($this->category_id == 5) ||
+            ($this->category && (
+                $this->category->slug === 'chocolates' ||
+                str_contains(strtolower($this->category->name), 'chocolate') ||
+                str_contains(strtolower($this->category->slug), 'chocolate')
+            ));
+    }
+
+    /**
+     * Get validated and normalized chocolate pack options
+     */
+    public function getChocolatePacks(): array
+    {
+        if (empty($this->chocolate_pack_options) || !is_array($this->chocolate_pack_options)) {
+            return [];
+        }
+
+        $normalized = [];
+        foreach ($this->chocolate_pack_options as $pack) {
+            if (!isset($pack['weight'], $pack['price']) || (float) $pack['weight'] <= 0 || (float) $pack['price'] <= 0) {
+                continue;
+            }
+            $unit = strtolower(trim($pack['unit'] ?? 'g'));
+            if ($unit === 'kilograms' || $unit === 'kilogram') $unit = 'kg';
+            if ($unit === 'grams' || $unit === 'gram') $unit = 'g';
+            if (!in_array($unit, ['g', 'kg'])) $unit = 'g';
+
+            $weight = (float) $pack['weight'];
+            $label = ($weight == (int) $weight ? (int) $weight : $weight) . $unit;
+
+            $normalized[] = [
+                'weight' => $weight,
+                'unit' => $unit,
+                'label' => $label,
+                'price' => round((float) $pack['price'], 2),
+            ];
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * Calculate price for selected chocolate pack size and number of packs
+     */
+    public function calculateChocolatePrice(float $packWeight, string $packUnit, int $numberOfPacks = 1): ?float
+    {
+        $unit = strtolower(trim($packUnit));
+        if ($unit === 'grams' || $unit === 'gram') $unit = 'g';
+        if ($unit === 'kilograms' || $unit === 'kilogram') $unit = 'kg';
+
+        $packs = $this->getChocolatePacks();
+        foreach ($packs as $pack) {
+            if (abs($pack['weight'] - $packWeight) < 0.001 && $pack['unit'] === $unit) {
+                $count = max(1, $numberOfPacks);
+                return round($pack['price'] * $count, 2);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Calculate price for selected piece count on Chocolate
+     */
+    public function calculateChocolatePiecePrice(int $pieces = 1): float
+    {
+        $unitPrice = (float) ($this->piece_price ?: $this->base_price ?: 0);
+        return round($unitPrice * max(1, $pieces), 2);
+    }
+
+    /**
      * Calculate price for selected quantity on Dessert
      * Uses custom tiers if override exists, otherwise linear formula:
      * price_per_piece = default_price / default_minimum_quantity
@@ -206,7 +308,12 @@ class Product extends Model
             }
         }
 
-        // 2. Linear formula based on admin's default price for minimum quantity
+        // 2. Unit price per piece if configured
+        if ($this->piece_price && (float) $this->piece_price > 0) {
+            return round((float) $this->piece_price * $effectiveQty, 2);
+        }
+
+        // 3. Linear formula based on admin's default price for minimum quantity
         $defPrice = (float) ($this->dessert_default_price ?: $this->base_price ?: 100.0);
         $pricePerPiece = $minQty > 0 ? ($defPrice / $minQty) : $defPrice;
 

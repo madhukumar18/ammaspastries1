@@ -12,6 +12,7 @@ use App\Models\ProductVariant;
 use App\Models\Outlet;
 use App\Models\Coupon;
 use App\Models\CouponUsage;
+use Carbon\Carbon;
 
 class OrderController extends Controller
 {
@@ -23,10 +24,11 @@ class OrderController extends Controller
             'customer_name' => 'required|string|max:255',
             'customer_phone' => 'required|string|max:20',
             'customer_email' => 'nullable|email|max:255',
-            'delivery_address' => 'required|string',
-            'delivery_area' => 'required|string',
+            'delivery_method' => 'nullable|in:home_delivery,pickup',
+            'delivery_address' => 'required_if:delivery_method,home_delivery|nullable|string',
+            'delivery_area' => 'required_if:delivery_method,home_delivery|nullable|string',
             'delivery_city' => 'nullable|string',
-            'delivery_pincode' => 'required|string|max:10',
+            'delivery_pincode' => 'required_if:delivery_method,home_delivery|nullable|string|max:10',
             'delivery_date' => 'required|date|after_or_equal:today',
             'delivery_time_slot' => 'required|string',
             'special_instructions' => 'nullable|string|max:500',
@@ -37,10 +39,90 @@ class OrderController extends Controller
             'items.*.quantity' => 'required|integer|min:1|max:50',
             'items.*.customization' => 'nullable|array',
         ], [
+            'delivery_date.after_or_equal' => "Please select today's date or a future date.",
             'items.*.product_id.exists' => 'One or more items in your cart are no longer available in our active catalog. Please refresh your cart or re-add the item.',
             'items.*.product_id.required' => 'Product ID is missing for an item in your cart.',
             'outlet_id.exists' => 'Selected bakery outlet is currently unavailable.',
         ]);
+
+        // Validate custom delivery date & time slot:
+        // 1. Date Restriction: Cannot be in the past
+        // 2. Restricted Hours: 9:00 AM to 10:30 PM
+        // 3. Minimum Lead Time: >= 45 minutes ahead of current time if ordering for today
+        $now = now('Asia/Kolkata');
+        $deliveryDate = Carbon::parse($validated['delivery_date'], 'Asia/Kolkata')->startOfDay();
+        $today = $now->copy()->startOfDay();
+
+        if ($deliveryDate->lt($today)) {
+            return response()->json([
+                'success' => false,
+                'message' => "Please select today's date or a future date.",
+                'errors' => [
+                    'delivery_date' => ["Please select today's date or a future date."]
+                ]
+            ], 422);
+        }
+
+        $timeStr = trim($validated['delivery_time_slot'] ?? '');
+        if (!empty($timeStr)) {
+            $isLegacyRange = str_contains($timeStr, '-');
+
+            try {
+                if ($isLegacyRange) {
+                    $parts = array_map('trim', explode('-', $timeStr));
+                    $parsedStart = Carbon::parse($parts[0], 'Asia/Kolkata');
+                    $parsedEnd = isset($parts[1]) ? Carbon::parse($parts[1], 'Asia/Kolkata') : $parsedStart;
+
+                    $deliveryStartTime = $deliveryDate->copy()->setTime($parsedStart->hour, $parsedStart->minute, $parsedStart->second);
+                    $deliveryEndTime = $deliveryDate->copy()->setTime($parsedEnd->hour, $parsedEnd->minute, $parsedEnd->second);
+
+                    $opening = $deliveryDate->copy()->setTime(9, 0, 0);
+                    $closing = $deliveryDate->copy()->setTime(22, 30, 0);
+
+                    if ($deliveryStartTime->lt($opening) || $deliveryEndTime->gt($closing)) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Orders can only be placed between 9:00 AM and 10:30 PM.',
+                            'errors' => [
+                                'delivery_time_slot' => ['Orders can only be placed between 9:00 AM and 10:30 PM.']
+                            ]
+                        ], 422);
+                    }
+                } else {
+                    $parsedTime = Carbon::parse($timeStr, 'Asia/Kolkata');
+                    $deliveryDateTime = $deliveryDate->copy()
+                        ->setTime($parsedTime->hour, $parsedTime->minute, $parsedTime->second);
+
+                    $opening = $deliveryDate->copy()->setTime(9, 0, 0);
+                    $closing = $deliveryDate->copy()->setTime(22, 30, 0);
+
+                    if ($deliveryDateTime->lt($opening) || $deliveryDateTime->gt($closing)) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Orders can only be placed between 9:00 AM and 10:30 PM.',
+                            'errors' => [
+                                'delivery_time_slot' => ['Orders can only be placed between 9:00 AM and 10:30 PM.']
+                            ]
+                        ], 422);
+                    }
+
+                    if ($deliveryDate->isSameDay($today)) {
+                        $minAllowed = $now->copy()->addMinutes(45);
+                        if ($deliveryDateTime->lt($minAllowed)) {
+                            return response()->json([
+                                'success' => false,
+                                'message' => 'Please select a time at least 45 minutes from now.',
+                                'errors' => [
+                                    'delivery_time_slot' => ['Please select a time at least 45 minutes from now.']
+                                ]
+                            ], 422);
+                        }
+                    }
+                }
+            } catch (\Exception $e) {
+                // If unparseable string, proceed with standard validation
+            }
+        }
 
         return DB::transaction(function () use ($validated, $request) {
             $subtotal = 0;
@@ -99,7 +181,9 @@ class OrderController extends Controller
             }
 
             // 2. Delivery fee & Coupon discount calculation
-            $deliveryFee = $subtotal >= 1000 ? 0 : 50; // free delivery above 1000
+            // Home Delivery: Flat ₹100, Outlet Pickup: ₹0
+            $isPickup = ($validated['delivery_method'] ?? 'home_delivery') === 'pickup';
+            $deliveryFee = $isPickup ? 0.0 : 100.0;
             $discount = 0;
             $appliedCoupon = null;
 
@@ -113,12 +197,24 @@ class OrderController extends Controller
                 }
             }
 
-            // 3. Tax & Total calculation
-            $tax = round(($subtotal - $discount) * 0.05, 2); // 5% GST on bakery items
-            $total = max(0, $subtotal - $discount + $deliveryFee + $tax);
+            // 3. Tax & Total calculation (GST completely removed as requested)
+            $tax = 0.0;
+            $total = max(0, $subtotal - $discount + $deliveryFee);
 
             // 4. Generate Order Number starting from 62473
             $orderNumber = Order::generateNextOrderNumber();
+
+            // Prepare pickup/delivery address snapshot
+            $outlet = Outlet::find($validated['outlet_id']);
+            $deliveryAddress = !empty($validated['delivery_address'])
+                ? $validated['delivery_address']
+                : ($outlet ? "Outlet Pickup at {$outlet->name} ({$outlet->address})" : 'Outlet Pickup');
+            $deliveryArea = !empty($validated['delivery_area'])
+                ? $validated['delivery_area']
+                : ($outlet?->area ?? 'Bengaluru');
+            $deliveryPincode = !empty($validated['delivery_pincode'])
+                ? $validated['delivery_pincode']
+                : ($outlet?->pincode ?? '560001');
 
             // 5. Create Order
             $order = Order::create([
@@ -126,16 +222,17 @@ class OrderController extends Controller
                 'user_id' => $request->user()?->id,
                 'outlet_id' => $validated['outlet_id'],
                 'customer_name' => $validated['customer_name'],
-                'customer_email' => $validated['customer_email'],
+                'customer_email' => $validated['customer_email'] ?? null,
                 'customer_phone' => $validated['customer_phone'],
-                'delivery_address' => $validated['delivery_address'],
-                'delivery_area' => $validated['delivery_area'],
+                'delivery_method' => $validated['delivery_method'] ?? 'home_delivery',
+                'delivery_address' => $deliveryAddress,
+                'delivery_area' => $deliveryArea,
                 'delivery_city' => $validated['delivery_city'] ?? 'Bengaluru',
-                'delivery_pincode' => $validated['delivery_pincode'],
+                'delivery_pincode' => $deliveryPincode,
                 'subtotal' => $subtotal,
                 'discount' => $discount,
                 'delivery_fee' => $deliveryFee,
-                'tax' => $tax,
+                'tax' => 0.0,
                 'total' => $total,
                 'coupon_code' => $appliedCoupon?->code,
                 'payment_status' => 'pending',
@@ -186,6 +283,8 @@ class OrderController extends Controller
                     'delivery_fee' => $order->delivery_fee,
                     'tax' => $order->tax,
                     'total' => $order->total,
+                    'delivery_date' => $order->delivery_date,
+                    'delivery_time_slot' => $order->delivery_time_slot,
                 ]
             ], 201);
         });

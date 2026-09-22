@@ -32,7 +32,7 @@ class AdminAuthController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Access denied: You are not authorized to create an administrator account.',
+                'message' => 'Self-registration is restricted. Team member accounts must be created by the Super Administrator from the Sub-Admins management panel.',
             ], 403);
         }
 
@@ -177,27 +177,12 @@ class AdminAuthController extends Controller
 
         $email = strtolower(trim($validated['email']));
 
-        if ($email !== self::AUTHORIZED_ADMIN_EMAIL) {
-            \App\Services\SecurityLoggerService::logThreat(
-                type: 'UNAUTHORIZED_ADMIN_FORGOT_PASSWORD',
-                severity: 'MEDIUM',
-                message: "Unauthorized forgot password attempt for: '{$email}'",
-                request: $request,
-                context: ['attempted_email' => $email]
-            );
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Access denied: You are not authorized to reset password for this email.',
-            ], 403);
-        }
-
         $admin = Admin::where('email', $email)->first();
 
-        if (!$admin) {
+        if (!$admin || !$admin->is_active) {
             return response()->json([
                 'success' => false,
-                'message' => 'No administrator account found for this email. Please create your account first.',
+                'message' => 'No active administrator account found for this email address.',
             ], 404);
         }
 
@@ -241,19 +226,12 @@ class AdminAuthController extends Controller
 
         $email = strtolower(trim($validated['email']));
 
-        if ($email !== self::AUTHORIZED_ADMIN_EMAIL) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Access denied: Invalid administrative request.',
-            ], 403);
-        }
-
         $admin = Admin::where('email', $email)->first();
 
-        if (!$admin) {
+        if (!$admin || !$admin->is_active) {
             return response()->json([
                 'success' => false,
-                'message' => 'No administrator account found.',
+                'message' => 'No active administrator account found.',
             ], 404);
         }
 

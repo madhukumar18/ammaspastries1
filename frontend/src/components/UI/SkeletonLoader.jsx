@@ -1,15 +1,15 @@
 import React from 'react';
 
 export const ProductCardSkeleton = () => (
-  <div className="bg-white rounded-3xl p-4 border border-amber-100/50 shadow-xs animate-pulse">
-    <div className="aspect-square w-full rounded-2xl bg-slate-100 mb-3" />
-    <div className="h-3 w-16 bg-slate-100 rounded-full mb-2" />
-    <div className="h-5 w-3/4 bg-slate-200 rounded-md mb-2" />
-    <div className="h-3 w-full bg-slate-100 rounded-md mb-1" />
-    <div className="h-3 w-2/3 bg-slate-100 rounded-md mb-4" />
-    <div className="pt-3 border-t border-slate-100 flex justify-between items-center">
-      <div className="h-6 w-16 bg-slate-200 rounded-md" />
-      <div className="h-8 w-20 bg-amber-200/50 rounded-xl" />
+  <div className="bg-white rounded-xl sm:rounded-2xl p-2 sm:p-3 border border-amber-100/50 shadow-xs animate-pulse">
+    <div className="aspect-square w-full rounded-lg sm:rounded-xl bg-slate-100 mb-2" />
+    <div className="h-2.5 sm:h-3 w-12 sm:w-16 bg-slate-100 rounded-full mb-1.5" />
+    <div className="h-3.5 sm:h-5 w-3/4 bg-slate-200 rounded-md mb-1.5" />
+    <div className="h-2.5 sm:h-3 w-full bg-slate-100 rounded-md mb-1" />
+    <div className="h-2.5 sm:h-3 w-2/3 bg-slate-100 rounded-md mb-2.5 sm:mb-4" />
+    <div className="pt-2 sm:pt-3 border-t border-slate-100 flex justify-between items-center gap-1">
+      <div className="h-4 sm:h-6 w-12 sm:w-16 bg-slate-200 rounded-md" />
+      <div className="h-6 sm:h-8 w-14 sm:w-20 bg-amber-200/50 rounded-lg sm:rounded-xl" />
     </div>
   </div>
 );

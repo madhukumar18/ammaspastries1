@@ -136,25 +136,28 @@ const OrderConfirmationPage = () => {
 
           <div className="pt-3 border-t border-slate-100 space-y-1.5 text-xs text-slate-600">
             <div className="flex justify-between">
-              <span>Subtotal:</span>
-              <span>₹{order.subtotal}</span>
+              <span>Cake price:</span>
+              <span className="font-semibold text-chocolate">₹{order.subtotal}</span>
             </div>
             {order.discount > 0 && (
-              <div className="flex justify-between text-emerald-700">
+              <div className="flex justify-between text-emerald-700 font-semibold">
                 <span>Discount:</span>
                 <span>- ₹{order.discount}</span>
               </div>
             )}
-            <div className="flex justify-between">
-              <span>Delivery Fee:</span>
-              <span>{order.delivery_fee === 0 ? 'FREE' : `₹${order.delivery_fee}`}</span>
+            <div className="flex justify-between items-center">
+              <span>Delivery / Pickup charge:</span>
+              <span className="font-semibold">
+                {order.delivery_method === 'pickup' || Number(order.delivery_fee) === 0 ? (
+                  <span className="text-emerald-700 font-bold">₹0 (Free Outlet Pickup)</span>
+                ) : (
+                  <span className="text-chocolate">₹{order.delivery_fee} (Home Delivery)</span>
+                )}
+              </span>
             </div>
-            <div className="flex justify-between">
-              <span>GST (5%):</span>
-              <span>₹{order.tax}</span>
-            </div>
+            {/* GST completely removed */}
             <div className="pt-2 border-t border-slate-200 flex justify-between font-bold text-chocolate text-base">
-              <span>Total Paid:</span>
+              <span>Final Total:</span>
               <span className="text-amber-700">₹{order.total}</span>
             </div>
           </div>
