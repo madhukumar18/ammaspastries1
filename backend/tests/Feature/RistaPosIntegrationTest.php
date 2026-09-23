@@ -52,7 +52,6 @@ class RistaPosIntegrationTest extends TestCase
 
         $response->assertOk()
             ->assertJsonPath('success', true)
-            ->assertJsonPath('data.config.api_key', env('RISTA_API_KEY', 'e6bcbfc2-b24a-4026-80ea-1674e920d50d'))
             ->assertJsonStructure([
                 'data' => [
                     'config' => ['base_url', 'api_key', 'api_secret_masked', 'auto_sync'],

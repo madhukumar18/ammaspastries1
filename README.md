@@ -56,66 +56,70 @@ A production-grade, full-stack e-commerce web platform for **Ammas Pastries** (p
 ## Local Development Quick Start
 
 ### Prerequisites
-- **PHP 8.2+** (tested on PHP 8.5)
-- **Composer**
+- **PHP 8.2+** (with `pdo`, `mbstring`, `openssl`, `tokenizer`, `xml`, `curl` extensions)
+- **Composer** (PHP package manager)
 - **Node.js 18+** & **npm**
-- **MySQL** (Optional: SQLite zero-configuration driver is pre-configured for instant zero-dependency testing)
+- **MySQL** or **SQLite** (SQLite works out-of-the-box with zero installation)
 
 ---
 
-### Step 1: Start Laravel Backend
+### Option A: 1-Click Automated Setup (Recommended)
 
-1. Open a terminal in the `backend/` folder:
-   ```bash
-   cd backend
-   ```
+#### On Windows:
+1. Double-click `setup.bat` (or run `./setup.bat` in Command Prompt / PowerShell).
+2. Double-click `run.bat` to start both the Laravel backend and React frontend dev servers simultaneously!
 
-2. Copy environment file and configure database:
-   ```bash
-   cp .env.example .env
-   ```
-   > **Note:** By default, `.env` is configured for **SQLite** (`database/database.sqlite`), allowing instant local startup without installing MySQL. To use MySQL, update `DB_CONNECTION=mysql`, `DB_HOST=127.0.0.1`, `DB_DATABASE=ammas_pastries`, `DB_USERNAME=root`, `DB_PASSWORD=`.
-
-3. Generate application key:
-   ```bash
-   php artisan key:generate
-   ```
-
-4. Create storage symlink:
-   ```bash
-   php artisan storage:link
-   ```
-
-5. Run database migrations and seed all sample data (products, outlets, orders, banners, admin):
-   ```bash
-   php artisan migrate:fresh --seed
-   ```
-
-6. Start the Laravel development server:
-   ```bash
-   php artisan serve --port=8000
-   ```
-   Backend API will run at: `http://127.0.0.1:8000`
+#### On Linux / macOS:
+```bash
+chmod +x setup.sh run.sh
+./setup.sh
+./run.sh
+```
 
 ---
 
-### Step 2: Start React Frontend
+### Option B: Manual Setup
 
-1. Open a second terminal in the `frontend/` folder:
-   ```bash
-   cd frontend
-   ```
+#### Step 1: Backend Setup (Laravel)
+```bash
+cd backend
 
-2. Install dependencies (if not already installed):
-   ```bash
-   npm install
-   ```
+# 1. Copy environment template
+cp .env.example .env
 
-3. Start the Vite development server:
-   ```bash
-   npm run dev
-   ```
-   Frontend store will run at: `http://localhost:5173`
+# 2. Install PHP dependencies
+composer install
+
+# 3. Generate application encryption key
+php artisan key:generate
+
+# 4. Create public storage symlink for uploaded images
+php artisan storage:link
+
+# 5. Run database migrations and seed all sample data (products, outlets, admins, categories)
+php artisan migrate --seed
+
+# 6. Start the Laravel development server
+php artisan serve --port=8000
+```
+Backend API will be running at: `http://127.0.0.1:8000`
+
+#### Step 2: Frontend Setup (React + Vite)
+```bash
+cd frontend
+
+# 1. Copy frontend environment template
+cp .env.example .env
+
+# 2. Install Node dependencies
+npm install
+
+# 3. Start Vite development server
+npm run dev
+```
+Frontend application will be running at: `http://localhost:5173`
+
+> **Note on Environment & Security:** `.env` files contain local secrets and passwords and are strictly ignored by `.gitignore`. They are never pushed to GitHub. When running on any new machine, simply copy `.env.example` to `.env` as shown above.
 
 ---
 

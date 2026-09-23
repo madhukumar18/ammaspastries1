@@ -21,6 +21,14 @@ class AdminMediaController extends Controller
         $folder = $request->input('folder', 'products');
         $file = $request->file('image');
 
+        if (preg_match('/\.(php|phtml|phar|sh|exe|bat|cmd|js)\./i', $file->getClientOriginalName())) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Upload Rejected',
+                'message' => 'Potentially dangerous filename detected.',
+            ], 400);
+        }
+
         $originalName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
         $cleanName = Str::slug($originalName);
         $extension = $file->getClientOriginalExtension();

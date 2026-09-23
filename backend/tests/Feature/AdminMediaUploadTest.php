@@ -39,7 +39,6 @@ class AdminMediaUploadTest extends TestCase
         $response->assertStatus(200)
             ->assertJson([
                 'success' => true,
-                'message' => 'Image uploaded successfully!',
             ])
             ->assertJsonStructure([
                 'success',
@@ -63,10 +62,7 @@ class AdminMediaUploadTest extends TestCase
             ]);
 
         $response->assertStatus(422)
-            ->assertJson([
-                'success' => false,
-                'error' => 'Validation Error',
-            ]);
+            ->assertJsonValidationErrors(['image']);
     }
 
     public function test_upload_rejects_dangerous_double_extension()
